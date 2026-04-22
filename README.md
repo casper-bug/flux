@@ -16,7 +16,7 @@
 - **☁️ Zero-Server Backend:** All data stays within your personal Google Drive. Every file uploaded and link saved is stored securely in a dedicated `FluxSpace` folder in your Drive root.
 - **🔒 Secure Architecture:** Flux requests strictly limited `drive.file` permissions, meaning it can only access files it creates. It cannot read your personal documents.
 - **📱 PWA Ready:** Installable on iOS, Android, macOS, and Windows for a native, app-like experience with offline caching.
-- **🎨 Nothing Warp Aesthetic:** Built with a beautiful monotone design language, `Space Mono` typography, and smooth glass-morphism blur effects.
+- **🎨 Aesthetics:** Built with a beautiful monotone design language, `Space Mono` typography, and smooth glass-morphism blur effects.
 - **📋 Auto-Copy Links:** Seamlessly sync links between devices with automatic clipboard copying as soon as the app opens.
 
 ## 🛠️ Setup & Deployment
@@ -52,5 +52,3 @@ Host the repository on any static hosting provider like **GitHub Pages**, Vercel
 - Google Drive API v3
 - Material Symbols
 
-## 📄 License
-This project is open-source and available under the MIT License.
