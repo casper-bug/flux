@@ -46,6 +46,3 @@ Because Flux uses a serverless architecture, you must configure your own **Googl
 - Google Drive API v3
 - Google Identity Services (GIS)
 - PWA Web Share Target API
-
-## 📄 License
-This project is open-source under the MIT License.
