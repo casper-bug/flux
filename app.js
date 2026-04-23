@@ -30,15 +30,14 @@ const uploadLbl     = document.getElementById('uploadProgressLabel');
 
 const textList      = document.getElementById('textList');
 const fileList      = document.getElementById('fileList');
+const textSection   = document.getElementById('textSectionTitle');
+const fileSection   = document.getElementById('fileSectionTitle');
 const emptyState    = document.getElementById('emptyState');
 const refreshBtn    = document.getElementById('refreshBtn');
 const configBanner  = document.getElementById('configBanner');
 const toast         = document.getElementById('toast');
 const toastIcon     = document.getElementById('toastIcon');
 const toastText     = document.getElementById('toastText');
-
-const dlBar         = document.getElementById('dlBar');
-const dlText        = document.getElementById('dlText');
 
 const modalOverlay  = document.getElementById('modalOverlay');
 const modalTitle    = document.getElementById('modalTitle');
@@ -57,8 +56,10 @@ window.addEventListener('load', () => {
   // Try to recover session immediately before GIS loads
   recoverSession();
   
+  // Load cached items for instant UI
+  loadCachedItems();
+  
   loadGISScript();
-  // checkSharedData is now called inside recoverSession or fetchUserInfo to ensure auth
 });
 
 // ─── Authentication Recovery ─────────────────────────────────
@@ -200,16 +201,16 @@ function signOut() {
 aboutLink.addEventListener('click', () => {
   const content = `
     Flux is a cross-device sharing tool that uses your own Google Drive for storage.
-    
-    HOW IT WORKS:
+
+    HOW IT WORKS
     Everything is stored in a folder called "FluxSpace" in your Drive. Because it is a PWA, you can install it as an app on your phone or PC.
-    
-    PRIVACY:
+
+    PRIVACY & SECURITY
     • No Servers: Your data moves directly between your browser and Google.
-    • Restricted: Flux can only see the files it creates. It cannot access your other personal documents.
-    
-    CREATOR: <a href="https://github.com/casper-bug" target="_blank" style="color:var(--text); text-decoration:underline;">casper-bug</a>
-    SOURCE: <a href="https://github.com/casper-bug/flux" target="_blank" style="color:var(--text); text-decoration:underline;">GitHub Repository</a>
+    • Limited Access: Flux can only see and manage the files it creates. It is technically unable to access any of your other personal documents.
+
+    CREATOR
+    <a href="https://github.com/casper-bug" target="_blank" style="color:var(--text); text-decoration:underline;">casper-bug</a>
   `;
   showModal('ABOUT FLUX', content, 'Close', false, true);
 });
@@ -261,6 +262,7 @@ async function loadItems() {
     const q = encodeURIComponent(`'${fluxFolderId}' in parents and trashed=false`);
     const r = await driveAPI(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size,createdTime,appProperties,webViewLink)&orderBy=createdTime desc`);
     items = r.files || [];
+    localStorage.setItem('flux_items_cache', JSON.stringify(items));
     renderItems();
     
     // Auto-copy latest text (OTPs, Passwords, Links)
@@ -309,12 +311,17 @@ function renderItems() {
   textList.innerHTML = '';
   fileList.innerHTML = '';
   
+  let textCount = 0;
+  let fileCount = 0;
+
   if (!items.length) {
+    textSection.style.display = 'none';
+    fileSection.style.display = 'flex'; // Keep refresh button visible
     emptyState.style.display = 'block';
-    fileList.appendChild(emptyState);
     return;
   }
   emptyState.style.display = 'none';
+  fileSection.style.display = 'flex';
 
   items.forEach(file => {
     const isText = file.mimeType === 'application/vnd.flux.link' || (file.appProperties && file.appProperties.url);
@@ -339,13 +346,15 @@ function renderItems() {
     `;
 
     // Click behavior
-    const handleAction = () => {
+    const handleAction = (e) => {
+      if (e) e.stopPropagation();
+      const btn = el.querySelector('.download-btn');
       if (isText) {
         navigator.clipboard.writeText(content).then(() => {
           showToast('Copied to clipboard', true, 'content_copy');
         });
       } else {
-        downloadFile(file.id, file.name);
+        downloadFile(file.id, file.name, btn);
       }
     };
     
@@ -422,9 +431,16 @@ function renderItems() {
       }
     });
 
-    if (isText) textList.appendChild(el);
-    else fileList.appendChild(el);
+    if (isText) {
+      textList.appendChild(el);
+      textCount++;
+    } else {
+      fileList.appendChild(el);
+      fileCount++;
+    }
   });
+
+  textSection.style.display = textCount > 0 ? 'flex' : 'none';
 }
 
 // ─── Uploads (Files & Folders) ───────────────────────────────
@@ -605,30 +621,23 @@ saveLinkBtn.addEventListener('click', async () => {
 linkInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveLinkBtn.click(); });
 
 // ─── Downloading ─────────────────────────────────────────────
-function downloadFile(fileId, fileName) {
-  dlTitle.textContent = `Downloading ${fileName}...`;
-  dlBar.style.width = '0%';
-  dlText.textContent = '0%';
-  dlOverlay.classList.add('active');
+function downloadFile(fileId, fileName, btn) {
+  const iconSpan = btn ? btn.querySelector('.material-symbols-outlined') : null;
+  if (btn) {
+    btn.classList.add('spinning');
+    if (iconSpan) iconSpan.textContent = 'sync';
+  }
 
   const xhr = new XMLHttpRequest();
   xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
   xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
   xhr.responseType = 'blob';
   
-  xhr.onprogress = e => {
-    if (e.lengthComputable) {
-      const pct = Math.round((e.loaded / e.total) * 100);
-      dlBar.style.width = pct + '%';
-      dlText.textContent = pct + '%';
-    } else {
-      dlBar.style.width = '100%';
-      dlText.textContent = formatBytes(e.loaded);
-    }
-  };
-  
   xhr.onload = () => {
-    dlOverlay.classList.remove('active');
+    if (btn) {
+      btn.classList.remove('spinning');
+      if (iconSpan) iconSpan.textContent = 'download';
+    }
     if (xhr.status === 200) {
       const url = URL.createObjectURL(xhr.response);
       const a = document.createElement('a');
@@ -642,7 +651,10 @@ function downloadFile(fileId, fileName) {
   };
   
   xhr.onerror = () => {
-    dlOverlay.classList.remove('active');
+    if (btn) {
+      btn.classList.remove('spinning');
+      if (iconSpan) iconSpan.textContent = 'download';
+    }
     showToast('Network error during download', false);
   };
   
