@@ -104,6 +104,10 @@ function loadGISScript() {
 let tokenClient;
 function initGIS() {
   if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') return;
+  if (typeof google === 'undefined') {
+    setTimeout(initGIS, 500);
+    return;
+  }
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
@@ -530,8 +534,9 @@ async function handleFiles(files) {
   uploadBar.style.width = '0%';
   fileInput.value = ''; // reset
   showToast('Upload complete', true);
-  // Wait longer for Google Drive search index to update
-  setTimeout(loadItems, 3000);
+  // Multi-stage refresh to account for Google Drive indexing lag
+  setTimeout(loadItems, 1500);
+  setTimeout(loadItems, 5000);
 }
 
 function uploadSingleFile(file) {
