@@ -2,7 +2,7 @@
   <img src="logo.svg" width="120" height="120" alt="Flux Logo">
 </p>
 
-# FLUX DROP (v41)
+# FLUX DROP
 ### Personal Cross-Device Synchronization Engine
 
 
