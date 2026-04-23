@@ -28,25 +28,69 @@ const uploadProgress= document.getElementById('uploadProgress');
 const uploadBar     = document.getElementById('uploadProgressBar');
 const uploadLbl     = document.getElementById('uploadProgressLabel');
 
-const itemsList     = document.getElementById('itemsList');
+const textList      = document.getElementById('textList');
+const fileList      = document.getElementById('fileList');
 const emptyState    = document.getElementById('emptyState');
 const refreshBtn    = document.getElementById('refreshBtn');
 const configBanner  = document.getElementById('configBanner');
 const toast         = document.getElementById('toast');
+const toastIcon     = document.getElementById('toastIcon');
+const toastText     = document.getElementById('toastText');
 
-const dlOverlay     = document.getElementById('dlOverlay');
-const dlTitle       = document.getElementById('dlTitle');
 const dlBar         = document.getElementById('dlBar');
 const dlText        = document.getElementById('dlText');
+
+const modalOverlay  = document.getElementById('modalOverlay');
+const modalTitle    = document.getElementById('modalTitle');
+const modalBody     = document.getElementById('modalBody');
+const modalCancel   = document.getElementById('modalCancelBtn');
+const modalConfirm  = document.getElementById('modalConfirmBtn');
+const modalActions  = document.getElementById('modalActions');
+const aboutLink     = document.getElementById('aboutLink');
 
 // ─── Init ────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') {
     configBanner.style.display = 'block';
   }
+  
+  // Try to recover session immediately before GIS loads
+  recoverSession();
+  
   loadGISScript();
-  checkSharedData();
+  // checkSharedData is now called inside recoverSession or fetchUserInfo to ensure auth
 });
+
+// ─── Authentication Recovery ─────────────────────────────────
+function recoverSession() {
+  const savedToken = localStorage.getItem('flux_token');
+  const expiry = localStorage.getItem('flux_token_expiry');
+  
+  if (savedToken && expiry && Date.now() < parseInt(expiry, 10)) {
+    accessToken = savedToken;
+    
+    // Hide overlay immediately
+    overlay.classList.add('hidden');
+    
+    // Restore cached user info for instant UI feedback
+    const cachedUser = localStorage.getItem('flux_user_info');
+    if (cachedUser) {
+      try {
+        const info = JSON.parse(cachedUser);
+        updateUserUI(info);
+      } catch (e) { console.warn('Failed to parse cached user info'); }
+    }
+    
+    // Start background tasks
+    ensureFluxFolder().then(() => {
+      loadItems();
+      checkSharedData(); // Process shared data as soon as we have folder access
+    });
+
+    // Refresh user info in background
+    fetchUserInfo();
+  }
+}
 
 // ─── Google Identity Services ────────────────────────────────
 function loadGISScript() {
@@ -65,22 +109,15 @@ function initGIS() {
     callback: handleTokenResponse,
   });
   
-  // Check for saved token to prevent sign-out on refresh
-  const savedToken = localStorage.getItem('flux_token');
-  const expiry = localStorage.getItem('flux_token_expiry');
-  if (savedToken && expiry && Date.now() < parseInt(expiry, 10)) {
-    accessToken = savedToken;
-    fetchUserInfo();
-    overlay.classList.add('hidden');
-  } else if (localStorage.getItem('flux_session') && tokenClient) {
-    // try to silent auth, might fail if popups blocked
-    // tokenClient.requestAccessToken({ prompt: '' });
+  // If we haven't recovered a session yet, check for flux_session flag
+  if (!accessToken && localStorage.getItem('flux_session')) {
+    // We could try silent auth here, but usually recoverSession handles it
   }
 }
 
 function signIn() {
   if (!tokenClient) {
-    showToast('⚠ Set your Client ID first', false);
+    showToast('Set your Client ID first', false);
     return;
   }
   tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -90,7 +127,7 @@ function handleTokenResponse(resp) {
   if (resp.error) { showToast('Sign-in failed', false); return; }
   
   if (!google.accounts.oauth2.hasGrantedAllScopes(resp, 'https://www.googleapis.com/auth/drive.file')) {
-    showToast('⚠ Google Drive permission missing! Please sign in again and check the box.', false);
+    showToast('Drive permission missing', false);
     return;
   }
   
@@ -107,27 +144,40 @@ async function fetchUserInfo() {
     const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    const info = await r.json();
-    const name = info.given_name || info.name || 'User';
-    if (info.picture) {
-      userAvatar.src = info.picture;
-      userAvatar.style.display = 'block';
-    } else {
-      userAvatar.style.display = 'none';
+    if (!r.ok) {
+       if (r.status === 401) signOut();
+       return;
     }
-    userName.textContent = name;
-    userName.style.display = 'block';
-    signInBtn.style.display = 'none';
-    signOutBtn.style.display = 'inline-flex';
-    showToast('✓ Welcome, ' + name, true);
+    const info = await r.json();
+    const oldInfo = localStorage.getItem('flux_user_info');
+    localStorage.setItem('flux_user_info', JSON.stringify(info));
     
-    await ensureFluxFolder();
-    loadItems();
-    checkSharedData(); // Try again after auth
+    const shouldShowWelcome = !oldInfo;
+    updateUserUI(info, shouldShowWelcome);
+    
+    if (!fluxFolderId) {
+      await ensureFluxFolder();
+      loadItems();
+      checkSharedData();
+    }
   } catch(e) {
-    console.error('Initialization Error:', e);
-    showToast('⚠ Drive Error: ' + e.message, false);
+    console.error('Session error:', e);
   }
+}
+
+function updateUserUI(info, showWelcome = false) {
+  const name = info.given_name || info.name || 'User';
+  if (info.picture) {
+    userAvatar.src = info.picture;
+    userAvatar.style.display = 'block';
+  } else {
+    userAvatar.style.display = 'none';
+  }
+  userName.textContent = name;
+  userName.style.display = 'block';
+  signInBtn.style.display = 'none';
+  signOutBtn.style.display = 'inline-flex';
+  if (showWelcome) showToast('Welcome, ' + name, true);
 }
 
 function signOut() {
@@ -137,6 +187,7 @@ function signOut() {
   localStorage.removeItem('flux_session');
   localStorage.removeItem('flux_token');
   localStorage.removeItem('flux_token_expiry');
+  localStorage.removeItem('flux_user_info');
   userAvatar.style.display = 'none';
   userName.style.display = 'none';
   signInBtn.style.display = 'inline-flex';
@@ -144,6 +195,24 @@ function signOut() {
   overlay.classList.remove('hidden');
   showToast('Signed out', false);
 }
+
+// ─── Footer / About ──────────────────────────────────────────
+aboutLink.addEventListener('click', () => {
+  const content = `
+    Flux is a cross-device sharing tool that uses your own Google Drive for storage.
+    
+    HOW IT WORKS:
+    Everything is stored in a folder called "FluxSpace" in your Drive. Because it is a PWA, you can install it as an app on your phone or PC.
+    
+    PRIVACY:
+    • No Servers: Your data moves directly between your browser and Google.
+    • Restricted: Flux can only see the files it creates. It cannot access your other personal documents.
+    
+    CREATOR: <a href="https://github.com/casper-bug" target="_blank" style="color:var(--text); text-decoration:underline;">casper-bug</a>
+    SOURCE: <a href="https://github.com/casper-bug/flux" target="_blank" style="color:var(--text); text-decoration:underline;">GitHub Repository</a>
+  `;
+  showModal('ABOUT FLUX', content, 'Close', false, true);
+});
 
 signInBtn.addEventListener('click', signIn);
 signOutBtn.addEventListener('click', signOut);
@@ -154,14 +223,15 @@ async function ensureFluxFolder() {
   // Use localStorage to keep folder ID persistent
   const savedFolderId = localStorage.getItem('flux_folder_id');
   if (savedFolderId) {
-    try {
-      await driveAPI(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id`);
-      fluxFolderId = savedFolderId;
-      return;
-    } catch (e) {
+    fluxFolderId = savedFolderId;
+    // Verify in background, don't await
+    driveAPI(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id`).catch(e => {
       console.warn('Saved folder ID invalid, searching again...');
       localStorage.removeItem('flux_folder_id');
-    }
+      fluxFolderId = null;
+      ensureFluxFolder(); // Try to find/create it again
+    });
+    return;
   }
 
   const q = encodeURIComponent(`name='${FLUX_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
@@ -193,20 +263,27 @@ async function loadItems() {
     items = r.files || [];
     renderItems();
     
-    // Auto-copy latest link (if it's not the one we just saved/uploaded ourselves)
+    // Auto-copy latest text (OTPs, Passwords, Links)
     if (items.length > 0) {
       const latest = items[0];
-      const isLink = latest.mimeType === 'application/vnd.flux.link' || (latest.appProperties && latest.appProperties.url);
-      if (isLink) {
-        const url = latest.appProperties?.url || latest.name;
+      const isText = latest.mimeType === 'application/vnd.flux.link' || (latest.appProperties && latest.appProperties.url);
+      
+      if (isText) {
+        const text = latest.appProperties?.url || latest.name;
         const lastCopied = localStorage.getItem('flux_last_copied');
-        if (lastCopied !== latest.id) {
-          // Verify it's not one we created in this session
-          if (!localStorage.getItem(`self_saved_${latest.id}`)) {
+        
+        if (lastCopied !== latest.id && !localStorage.getItem(`self_saved_${latest.id}`)) {
+          // Auto-copy logic: Always auto-copy OTPs/Passwords, Links depend on type
+          const otp = isOTP(text);
+          const pwd = isPassword(text);
+          const link = text.startsWith('http');
+          
+          if (otp || pwd || link) {
             try {
-              await navigator.clipboard.writeText(url);
+              await navigator.clipboard.writeText(text);
               localStorage.setItem('flux_last_copied', latest.id);
-              showToast('🔗 New link auto-copied', true);
+              const label = otp ? 'OTP' : (pwd ? 'Password' : 'Link');
+              showToast(`${label} auto-copied`, true, 'content_copy');
             } catch(e) {
               console.warn('Clipboard auto-copy blocked', e);
             }
@@ -216,7 +293,7 @@ async function loadItems() {
         // If it's a file and it's new, just notify
         const lastSeen = localStorage.getItem('flux_last_seen');
         if (lastSeen && lastSeen !== latest.id && !localStorage.getItem(`self_saved_${latest.id}`)) {
-           showToast('📦 New file received!', true);
+           showToast('New file received!', true);
         }
         localStorage.setItem('flux_last_seen', latest.id);
       }
@@ -229,19 +306,22 @@ async function loadItems() {
 }
 
 function renderItems() {
-  [...itemsList.querySelectorAll('.item-card')].forEach(el => el.remove());
+  textList.innerHTML = '';
+  fileList.innerHTML = '';
   
   if (!items.length) {
     emptyState.style.display = 'block';
+    fileList.appendChild(emptyState);
     return;
   }
   emptyState.style.display = 'none';
 
   items.forEach(file => {
-    const isLink = file.mimeType === 'application/vnd.flux.link' || (file.appProperties && file.appProperties.url);
+    const isText = file.mimeType === 'application/vnd.flux.link' || (file.appProperties && file.appProperties.url);
     const name = file.name;
-    const url = isLink ? (file.appProperties?.url || file.name) : null;
-    const iconName = isLink ? 'link' : getFileIcon(name);
+    const content = isText ? (file.appProperties?.url || file.name) : null;
+    
+    let iconName = isText ? 'notes' : getFileIcon(name);
     
     const el = document.createElement('div');
     el.className = 'item-card';
@@ -249,34 +329,39 @@ function renderItems() {
       <div class="item-icon"><span class="material-symbols-outlined">${iconName}</span></div>
       <div class="item-info" title="${name}">
         <div class="item-name">${escHtml(name)}</div>
-        <div class="item-meta">${timeAgo(file.createdTime)} ${!isLink ? '· '+formatBytes(file.size) : ''}</div>
+        <div class="item-meta">${timeAgo(file.createdTime)} ${!isText ? '· '+formatBytes(file.size) : ''}</div>
       </div>
       <div class="item-actions">
-        <button class="action-btn share-btn" title="Share Link"><span class="material-symbols-outlined" style="font-size: 1.1rem;">share</span></button>
-        <button class="action-btn download-btn" title="${isLink ? 'Open Link' : 'Download'}"><span class="material-symbols-outlined" style="font-size: 1.1rem;">${isLink ? 'open_in_new' : 'download'}</span></button>
+        <button class="action-btn share-btn" title="Share"><span class="material-symbols-outlined" style="font-size: 1.1rem;">share</span></button>
+        <button class="action-btn download-btn" title="${isText ? 'Copy' : 'Download'}"><span class="material-symbols-outlined" style="font-size: 1.1rem;">${isText ? 'content_copy' : 'download'}</span></button>
         <button class="action-btn delete-btn" title="Delete"><span class="material-symbols-outlined" style="font-size: 1.1rem;">delete</span></button>
       </div>
     `;
 
     // Click behavior
-    const handleOpen = () => {
-      if (isLink) window.open(url, '_blank');
-      else downloadFile(file.id, file.name);
+    const handleAction = () => {
+      if (isText) {
+        navigator.clipboard.writeText(content).then(() => {
+          showToast('Copied to clipboard', true, 'content_copy');
+        });
+      } else {
+        downloadFile(file.id, file.name);
+      }
     };
     
-    el.querySelector('.item-info').addEventListener('click', handleOpen);
-    el.querySelector('.download-btn').addEventListener('click', handleOpen);
+    el.querySelector('.item-info').addEventListener('click', handleAction);
+    el.querySelector('.download-btn').addEventListener('click', handleAction);
     
     el.querySelector('.share-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
-      const shareUrl = isLink ? url : file.webViewLink;
+      const shareUrl = isText ? content : file.webViewLink;
       if (!shareUrl) {
-        showToast('⚠ Link not available yet', false);
+        showToast('Link not available yet', false);
         return;
       }
 
       // If it's a file, we need to ensure it's accessible to anyone with the link
-      if (!isLink) {
+      if (!isText) {
         const btn = el.querySelector('.share-btn');
         const iconSpan = btn.querySelector('.material-symbols-outlined');
         try {
@@ -302,7 +387,7 @@ function renderItems() {
         try {
           await navigator.share({
             title: name,
-            text: isLink ? `Check out this link via Flux Drop` : `Shared file: ${name}`,
+            text: isText ? content : `Shared file: ${name}`,
             url: shareUrl
           });
         } catch (err) {
@@ -312,22 +397,24 @@ function renderItems() {
         // Fallback for browsers without navigator.share
         try {
           await navigator.clipboard.writeText(shareUrl);
-          showToast('🔗 Link copied to clipboard', true);
+          showToast('Copied to clipboard', true);
         } catch (err) {
-          showToast('Failed to copy link', false);
+          showToast('Failed to copy', false);
         }
       }
     });
     
     el.querySelector('.delete-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('Delete this item?')) return;
+      const ok = await showModal('Delete Item', `Are you sure you want to delete "${name}"?`, 'Delete', true);
+      if (!ok) return;
+      
       el.style.opacity = '0.5';
       try {
         await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
           method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` }
         });
-        showToast('✓ Deleted', true);
+        showToast('Deleted', true);
         loadItems();
       } catch(err) {
         showToast('Delete failed', false);
@@ -335,7 +422,8 @@ function renderItems() {
       }
     });
 
-    itemsList.appendChild(el);
+    if (isText) textList.appendChild(el);
+    else fileList.appendChild(el);
   });
 }
 
@@ -424,7 +512,7 @@ async function handleFiles(files) {
   uploadProgress.style.display = 'none';
   uploadBar.style.width = '0%';
   fileInput.value = ''; // reset
-  showToast('✓ Upload complete', true);
+  showToast('Upload complete', true);
   // Wait longer for Google Drive search index to update
   setTimeout(loadItems, 3000);
 }
@@ -474,23 +562,27 @@ function uploadSingleFile(file) {
 // ─── Upload Links ────────────────────────────────────────────
 saveLinkBtn.addEventListener('click', async () => {
   if (!accessToken) { signIn(); return; }
-  let url = linkInput.value.trim();
-  if (!url) return;
-  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  let text = linkInput.value.trim();
+  if (!text) return;
+  
+  // Auto-prepend https only if it looks like a domain and isn't one already
+  if (text.includes('.') && !text.includes(' ') && !text.startsWith('http')) {
+     text = 'https://' + text;
+  }
 
   saveLinkBtn.disabled = true;
   saveLinkBtn.textContent = 'Saving...';
   
   try {
     const metadata = {
-      name: url,
+      name: text,
       mimeType: 'application/vnd.flux.link',
       parents: [fluxFolderId],
-      appProperties: { url: url }
+      appProperties: { url: text }
     };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', new Blob([url], { type: 'text/plain' }));
+    form.append('file', new Blob([text], { type: 'text/plain' }));
 
     const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST',
@@ -501,13 +593,13 @@ saveLinkBtn.addEventListener('click', async () => {
     localStorage.setItem(`self_saved_${savedData.id}`, '1');
     
     linkInput.value = '';
-    showToast('✓ Link saved', true);
+    showToast('Saved', true);
     loadItems();
   } catch(e) {
-    showToast('Failed to save link', false);
+    showToast('Failed to save', false);
   } finally {
     saveLinkBtn.disabled = false;
-    saveLinkBtn.textContent = 'Save Link';
+    saveLinkBtn.textContent = 'Save Text';
   }
 });
 linkInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveLinkBtn.click(); });
@@ -567,11 +659,40 @@ async function driveAPI(url, opts = {}) {
 
 // ─── Toast ───────────────────────────────────────────────────
 let toastTimer;
-function showToast(msg, success = true) {
+function showToast(msg, success = true, icon = null) {
   clearTimeout(toastTimer);
-  toast.textContent = msg;
+  toastText.textContent = msg;
+  toastIcon.textContent = icon || (success ? 'check_circle' : 'error');
   toast.className = 'show' + (success ? ' success' : ' error');
   toastTimer = setTimeout(() => toast.className = '', 3000);
+}
+
+// ─── Modal Utility ───────────────────────────────────────────
+function showModal(title, body, confirmText = 'Confirm', isDanger = false, isAlert = false) {
+  return new Promise((resolve) => {
+    modalTitle.textContent = title;
+    modalBody.innerHTML = body.replace(/\n/g, '<br>');
+    modalConfirm.textContent = confirmText;
+    
+    // Styling classes
+    modalConfirm.className = 'modal-btn confirm' + (isDanger ? ' danger' : '');
+    modalCancel.style.display = isAlert ? 'none' : 'inline-block';
+    
+    modalOverlay.classList.add('active');
+    
+    const cleanup = (val) => {
+      modalOverlay.classList.remove('active');
+      modalCancel.removeEventListener('click', onCancel);
+      modalConfirm.removeEventListener('click', onConfirm);
+      resolve(val);
+    };
+    
+    const onCancel = () => cleanup(false);
+    const onConfirm = () => cleanup(true);
+    
+    modalCancel.addEventListener('click', onCancel);
+    modalConfirm.addEventListener('click', onConfirm);
+  });
 }
 
 // ─── Share Target Handling ──────────────────────────────────
@@ -585,7 +706,7 @@ async function checkSharedData() {
 
   // If not signed in yet, we'll wait and checkSharedData will be called again by fetchUserInfo
   if (!accessToken || !fluxFolderId) {
-    showToast('Waiting for sign-in to process shared item...', true);
+    showToast('Awaiting authentication...', true, 'sync');
     return;
   }
 
@@ -672,6 +793,23 @@ function getFileIcon(name) {
 function escHtml(s) {
   if(!s) return '';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function isOTP(s) {
+  if (!s) return false;
+  // Common OTPs are 6-8 digits
+  return /^\d{6,8}$/.test(s.trim());
+}
+
+function isPassword(s) {
+  if (!s) return false;
+  // A password is often 8-20 chars, has variety, and is not a URL or phone number
+  const trimmed = s.trim();
+  if (trimmed.length < 8 || trimmed.length > 32) return false;
+  if (trimmed.includes(' ') || trimmed.startsWith('http')) return false;
+  // Phone numbers are digits, spaces, hyphens, plus
+  if (/^[\d\s\-+()]{10,}$/.test(trimmed)) return false;
+  return true;
 }
 
 // ─── Background Sync (Poll every 30s) ────────────────────────
