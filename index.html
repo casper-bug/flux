@@ -260,7 +260,6 @@
     border-radius: 12px;
   }
   
-  .dl-text { font-size: 0.75rem; color: var(--muted); }
   
   /* MODAL */
   #modalOverlay {
@@ -387,32 +386,33 @@
     <div id="uploadProgressLabel">Uploading...</div>
   </div>
 
-  <div class="section-title">
+  <div class="section-title" id="textSectionTitle">
     <span>TEXT</span>
   </div>
   <div id="textList" style="margin-bottom: 40px; display: flex; flex-direction: column; gap: 8px;">
     <!-- Text items here -->
   </div>
 
-  <div class="section-title" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 24px;">
+  <div class="section-title" id="fileSectionTitle" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 24px;">
     <span>FILES</span>
     <button id="refreshBtn" class="refresh-btn" title="Refresh List" style="background: var(--bg3); padding: 6px; border-radius: 50%; border: 1px solid var(--border);">
       <span class="material-symbols-outlined" style="font-size: 1.4rem;">refresh</span>
     </button>
   </div>
   
-  <div id="fileList" style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="empty-state" id="emptyState">
-      <span class="material-symbols-outlined" style="display: block; margin-bottom: 12px; font-size: 2rem; opacity: 0.2;">upload_file</span>
-      No Items Yet
-    </div>
+  <div id="fileList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px;">
+    <!-- File items here -->
+  </div>
+
+  <div class="empty-state" id="emptyState" style="display: none;">
+    <span class="material-symbols-outlined" style="display: block; margin-bottom: 12px; font-size: 2rem; opacity: 0.2;">upload_file</span>
+    No Items Yet
   </div>
 </main>
 
 <footer>
   <div class="footer-links">
     <a id="aboutLink">ABOUT</a>
-    <a href="https://github.com/casper-bug" target="_blank">GITHUB</a>
   </div>
 </footer>
 
@@ -422,14 +422,6 @@
   <span id="toastText"></span>
 </div>
 
-<!-- DL Overlay -->
-<div id="dlOverlay">
-  <div class="dl-card">
-    <div class="dl-title" id="dlTitle">Downloading...</div>
-    <div class="dl-progress"><div class="dl-bar" id="dlBar"></div></div>
-    <div class="dl-text" id="dlText">0%</div>
-  </div>
-</div>
 
 <!-- Custom Modal -->
 <div id="modalOverlay">
