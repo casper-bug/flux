@@ -60,6 +60,7 @@ window.addEventListener('load', () => {
   loadCachedItems();
   
   loadGISScript();
+  initGIS();
 });
 
 // ─── Authentication Recovery ─────────────────────────────────
@@ -122,8 +123,15 @@ function initGIS() {
 
 function signIn() {
   if (!tokenClient) {
-    showToast('Set your Client ID first', false);
-    return;
+    initGIS(); // Try initializing on-demand
+    if (!tokenClient) {
+      showToast('Initializing Google Sign-In...', true, 'sync');
+      setTimeout(() => {
+        if (tokenClient) tokenClient.requestAccessToken({ prompt: 'consent' });
+        else showToast('Sign-In not ready. Check connection.', false);
+      }, 2000);
+      return;
+    }
   }
   tokenClient.requestAccessToken({ prompt: 'consent' });
 }
