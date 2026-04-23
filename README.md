@@ -1,48 +1,51 @@
-<div align="center">
-  <img src="logo.svg" alt="Flux Logo" width="120" height="120">
-  <h1>Flux — Personal Workspace</h1>
-  <p><strong>A minimalist, cross-device content dropping portal powered by your own Google Drive.</strong></p>
-</div>
+<p align="center">
+  <img src="logo.svg" width="120" height="120" alt="Flux Logo">
+</p>
 
-<br>
+# FLUX DROP (v41)
+### Personal Cross-Device Synchronization Engine
 
-## Overview
 
-**Flux** is an ultra-minimalist Progressive Web App (PWA) designed for frictionless file, link, and text transfers across all your devices. Instead of relying on third-party servers, Flux securely connects directly to your personal Google Drive, giving you a private, private workspace that you fully control.
+**Flux** is a professional-grade, privacy-first PWA designed for seamless file and link sharing across all your devices. Powered entirely by your personal **Google Drive**, Flux provides a high-performance, "zero-snap" experience without the need for a dedicated backend.
 
-## Key Features
+---
 
-- **Instant Warm Start:** Advanced local caching allows the app to restore your session and profile information in milliseconds, making the transition from "Share" to "Sent" feel instantaneous.
-- **Universal Share Target:** Integrates directly into your device's native share menu. Share files or text from any app (browser, gallery, etc.) directly into Flux without opening the app first.
-- **Smart Text Handling:**
-  - **OTP & Password Detection:** Intelligent recognition of 6-digit codes and passwords with **automatic clipboard copy** upon arrival.
-  - **Auto-Sync Links:** Paste a link on your PC, and it's already copied to your mobile clipboard the moment you open the app.
-- **File & Folder Drop:** A unified dropzone for dragging and dropping files or entire folder structures directly into your `FluxSpace` folder.
-- **Zero-Server Backend:** All data stays within your personal Google Drive. Flux uses restricted `drive.file` permissions, meaning it can only see the data it creates.
-- **Themed Experience:** A consistent, high-end visual language featuring Nothing-inspired mono aesthetics, Space Mono typography, and custom themed modals for a premium feel.
+## 🚀 Key Features
 
-## 🛠️ Setup & Deployment
+### 📦 Storage & Reliability
+- **Resumable Upload Engine**: Upgraded XHR protocol for stable large-file transfers on unstable networks.
+- **Intelligent Conflict Intelligence**: Automated "Replace" or "Keep Both" resolution for filename collisions.
+- **Storage Dashboard**: Real-time visualization of Google Drive quota, with color-coded breakdown (Flux vs. Other vs. Free).
+- **Auto-Cleanup Engine**: Configurable maintenance to automatically purge items older than 1, 7, or 30 days.
 
-Because Flux uses a serverless architecture, you must configure your own **Google OAuth Client ID** to deploy your own instance.
 
-### 1. Configure Google Cloud Console
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project and enable the **Google Drive API**.
-3. Configure the **OAuth consent screen** (Internal for Workspace, External for personal accounts).
-   - *Note:* Add your email to the **Test users** list if the status is "Testing".
-   - Scopes required: `../auth/drive.file` and `../auth/userinfo.profile`.
-4. Create an **OAuth client ID** (Web application).
-   - Add your local and production URLs to **Authorized JavaScript origins**.
-5. Copy the generated **Client ID**.
+### 🔐 Security & Identity
+- **Biometric App Lock**: WebAuthn integration for Fingerprint or FaceID protection.
+- **Device Identity**: Customizable device naming—every share shows exactly which device sent it.
+- **Privacy-First**: All data stays within your `FluxSpace` folder in your private Google Drive.
+- **Hardened CSP**: Strict Content Security Policy protecting against XSS and unauthorized data exfiltration.
 
-### 2. Update & Deploy
-- Replace `CLIENT_ID` in `app.js` with your ID.
-- Host on any static provider (GitHub Pages, Vercel, etc.). 
-- *PWA features require an `HTTPS` connection to function.*
+### 📱 PWA Integration
+- **System Share Target**: Appear directly in the Android/iOS share menu to "Drop" files into Flux.
+- **Smart Clipboard**: Automatic detection and auto-copy for OTPs, passwords, and links.
+- **Offline Resilience**: Service Worker caching for instant load times and update notifications.
 
-## 💻 Tech Stack
-- HTML5 / Vanilla CSS
-- JavaScript (ES6+) / Service Workers
-- Google Drive API v3
-- Google Identity Services (GIS)
-- PWA Web Share Target API
+---
+
+## 🛠 Tech Stack
+- **Frontend**: Vanilla JavaScript (ES6+), HTML5, CSS3.
+- **Backend**: Google Drive API v3 (`drive.file` scope).
+- **Identity**: Google Identity Services (GIS).
+- **Architecture**: Performance-optimized with `DocumentFragment` batching and throttled event listeners.
+
+---
+
+## 📦 Getting Started
+1. Clone the repository to a web server.
+2. Update the `CLIENT_ID` in `app.js` with your Google Cloud Console ID.
+3. Access Flux via HTTPS for full PWA and Biometric support.
+
+---
+**Version**: 41.0.0  
+**Aesthetic**: Mono / Minimalist  
+**Developer**: Antigravity AI
