@@ -118,7 +118,7 @@ function initGIS() {
 function signIn() {
   if (!tokenClient) {
     initGIS();
-    showToast('Connecting to Google... Try again in a second.', true, 'sync');
+    showToast('Connecting..', true, 'sync');
     return;
   }
   tokenClient.requestAccessToken({ prompt: 'consent' });
