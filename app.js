@@ -543,7 +543,7 @@ async function handleFiles(files) {
   for (let i = 0; i < fileArray.length; i++) {
     const f = fileArray[i];
     
-    // Create inline placeholder with identical structure to real card
+    // Create inline placeholder with identical structure
     const el = document.createElement('div');
     el.className = 'item-card uploading';
     el.innerHTML = `
@@ -555,17 +555,17 @@ async function handleFiles(files) {
         </div>
       </div>
       <div class="item-actions">
-        <button class="action-btn" style="opacity:0; pointer-events:none;"><span class="material-symbols-outlined">sync</span></button>
+        <div class="upload-status" style="font-size: 0.7rem; font-weight: 700; color: var(--text); min-width: 32px; text-align: right;">0%</div>
       </div>
     `;
     fileList.prepend(el);
 
     try {
       await uploadSingleFile(f, el);
-      // Morph to "Ready" state while waiting for refresh
+      // Morph to "Ready" state
       el.classList.remove('uploading');
-      el.querySelector('.item-actions').innerHTML = '<span style="font-size:0.6rem; color:var(--text); font-weight:700;">SAVED</span>';
-      el.querySelector('.item-meta').innerHTML = 'Processing in Drive...';
+      el.querySelector('.upload-status').innerHTML = '<span class="material-symbols-outlined" style="color:var(--text); font-size: 1.2rem;">check_circle</span>';
+      el.querySelector('.item-meta').innerHTML = 'Saved to Drive';
     } catch(e) {
       showToast(`Failed to upload ${f.name}`, false);
       el.remove();
@@ -585,6 +585,7 @@ function uploadSingleFile(file, placeholderEl) {
       if (!fluxFolderId) throw new Error('Drive folder not initialized');
       
       const miniBar = placeholderEl.querySelector('.progress-mini-bar');
+      const statusText = placeholderEl.querySelector('.upload-status');
 
       // Step 1: Create file metadata
       const metadata = { name: file.name, parents: [fluxFolderId] };
@@ -607,9 +608,10 @@ function uploadSingleFile(file, placeholderEl) {
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       
       xhr.upload.onprogress = e => {
-        if (e.lengthComputable && miniBar) {
+        if (e.lengthComputable) {
           const pct = Math.floor(e.loaded / e.total * 100);
-          miniBar.style.width = pct + '%';
+          if (miniBar) miniBar.style.width = pct + '%';
+          if (statusText) statusText.textContent = pct + '%';
         }
       };
       
