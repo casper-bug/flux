@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flux-cache-v12';
+const CACHE_NAME = 'flux-cache-v17';
 const urlsToCache = [
   './',
   './index.html',
@@ -17,7 +17,17 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.map(key => {
+          if (key !== CACHE_NAME && key !== 'flux-share-target') {
+            return caches.delete(key);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', event => {
