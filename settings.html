@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings | Flux</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <style>
+    :root {
+      --bg: #050505; --bg2: #0a0a0a; --text: #f0f0f0; --muted: #888; --border: #222; --accent: #fff; --danger: #ff4444;
+    }
+    .light-mode {
+      --bg: #f8f9fa !important; --bg2: #ffffff !important; --text: #1a1a1a !important; --muted: #666 !important; --border: #ddd !important; --accent: #000 !important;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Space Mono', monospace; line-height: 1.6;
+      padding: 40px 20px; max-width: 600px; margin: 0 auto;
+      transition: background 0.3s, color 0.3s;
+      position: relative;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1.5px, transparent 1.5px);
+      background-size: 20px 20px; pointer-events: none; z-index: -1;
+    }
+    .light-mode body::before {
+      background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1.5px, transparent 1.5px) !important;
+    }
+    .light-mode img[src="logo.svg"] { filter: invert(1); }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--muted); text-decoration: none; font-size: 0.8rem;
+      margin-bottom: 40px; transition: color 0.2s;
+    }
+    .back-btn:hover { color: var(--text); }
+    h1 { font-size: 1.5rem; margin-bottom: 32px; letter-spacing: 2px; }
+    
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 24px; border-radius: 12px; margin-bottom: 24px;
+    }
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0; border-bottom: 1px solid var(--border);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-info { flex: 1; }
+    .setting-label { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+    .setting-desc { font-size: 0.75rem; color: var(--muted); }
+
+    /* Storage Bar */
+    .storage-container { margin-top: 12px; }
+    .storage-bar {
+      height: 12px; background: var(--border); border-radius: 6px;
+      overflow: hidden; display: flex; margin-bottom: 12px;
+    }
+    .storage-fill { height: 100%; transition: width 0.5s ease-out; }
+    .fill-flux { background: #e60000; }
+    .fill-other { background: var(--muted); opacity: 0.8; }
+    .storage-legend { display: flex; gap: 16px; font-size: 0.7rem; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* Controls */
+    .toggle-btn, .action-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 0.8rem;
+      padding: 8px 16px; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+    }
+    .toggle-btn:hover, .action-btn:hover { border-color: var(--text); }
+    .action-btn.danger { color: var(--danger); border-color: var(--danger); }
+    .action-btn.danger:hover { background: var(--danger); color: #fff; }
+
+    .user-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--border); }
+    .user-name { font-weight: 700; font-size: 1rem; }
+  </style>
+<script>
+  (function() {
+    const theme = localStorage.getItem('flux_theme');
+    if (theme === 'light') {
+      document.documentElement.classList.add('light-mode');
+      window.addEventListener('DOMContentLoaded', () => document.body.classList.add('light-mode'));
+    }
+  })();
+</script>
+</head>
+<body>
+  <a href="./" class="back-btn" id="backBtn">← BACK TO DASHBOARD</a>
+  
+  <h1>SETTINGS</h1>
+
+  <div class="user-profile" id="userProfile" style="display:none;">
+    <img src="" alt="" class="user-avatar" id="userAvatar">
+    <div class="user-name" id="userName">User</div>
+  </div>
+
+  <div class="card">
+    <div class="setting-label">STORAGE USAGE</div>
+    <div class="storage-container">
+      <div class="storage-bar">
+        <div class="storage-fill fill-flux" id="fillFlux" style="width:0%"></div>
+        <div class="storage-fill fill-other" id="fillOther" style="width:0%"></div>
+      </div>
+      <div class="storage-legend">
+        <div class="legend-item"><div class="dot fill-flux"></div> FLUX: <span id="fluxUsed">0B</span></div>
+        <div class="legend-item"><div class="dot fill-other"></div> OTHER: <span id="otherUsed">0B</span></div>
+        <div class="legend-item">FREE: <span id="driveFree">0B</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">APPEARANCE</div>
+        <div class="setting-desc">Switch between dark and light themes</div>
+      </div>
+      <button class="toggle-btn" id="themeToggle">
+        <span class="material-symbols-outlined" id="themeIcon">dark_mode</span>
+        <span id="themeText">DARK</span>
+      </button>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">HAPTIC FEEDBACK</div>
+        <div class="setting-desc">Vibrate on mobile interactions</div>
+      </div>
+      <button class="toggle-btn" id="hapticToggle">ON</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label">ACCOUNT</div>
+        <div class="setting-desc">Sign out of your Google account</div>
+      </div>
+      <button class="action-btn" id="signOutBtn">
+        <span class="material-symbols-outlined">logout</span> SIGN OUT
+      </button>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-label" style="color:var(--danger)">CLEAR ALL DATA</div>
+        <div class="setting-desc">Wipe local cache and reset app settings</div>
+      </div>
+      <button class="action-btn danger" id="clearDataBtn">RESET</button>
+    </div>
+  </div>
+
+  <script>
+    const haptic = (v) => {
+      if (localStorage.getItem('flux_haptic') === 'off') return;
+      if (navigator.vibrate) navigator.vibrate(v);
+    };
+
+    // Load State
+    const savedTheme = localStorage.getItem('flux_theme') || 'dark';
+    if (savedTheme === 'light') {
+      document.getElementById('themeText').textContent = 'LIGHT';
+      document.getElementById('themeIcon').textContent = 'light_mode';
+    }
+
+    const hapticState = localStorage.getItem('flux_haptic') || 'on';
+    document.getElementById('hapticToggle').textContent = hapticState.toUpperCase();
+
+    // User Info
+    const cachedUser = localStorage.getItem('flux_user_info');
+    if (cachedUser) {
+      const info = JSON.parse(cachedUser);
+      document.getElementById('userProfile').style.display = 'flex';
+      document.getElementById('userAvatar').src = info.picture || '';
+      document.getElementById('userName').textContent = info.name || 'User';
+    }
+
+    // Storage Info
+    const quota = JSON.parse(localStorage.getItem('flux_drive_quota') || '{}');
+    const fluxBytes = parseInt(localStorage.getItem('flux_used_bytes') || '0');
+
+    if (quota.limit) {
+      const limit = parseInt(quota.limit);
+      const usage = parseInt(quota.usage || 0);
+      const other = Math.max(0, usage - fluxBytes);
+      const free = Math.max(0, limit - usage);
+
+      const pFlux = Math.max((fluxBytes / limit) * 100, fluxBytes > 0 ? 0.5 : 0);
+      const pOther = Math.max((other / limit) * 100, other > 0 ? 0.5 : 0);
+
+      document.getElementById('fillFlux').style.width = pFlux + '%';
+      document.getElementById('fillOther').style.width = pOther + '%';
+      
+      const format = (bytes) => {
+        if (bytes === 0) return '0B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
+      };
+
+      document.getElementById('fluxUsed').textContent = format(fluxBytes);
+      document.getElementById('otherUsed').textContent = format(other);
+      document.getElementById('driveFree').textContent = format(free);
+    }
+
+    // Handlers
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      haptic(20);
+      const isLight = !document.documentElement.classList.contains('light-mode');
+      if (isLight) {
+        document.documentElement.classList.add('light-mode');
+        document.body.classList.add('light-mode');
+        localStorage.setItem('flux_theme', 'light');
+      } else {
+        document.documentElement.classList.remove('light-mode');
+        document.body.classList.remove('light-mode');
+        localStorage.setItem('flux_theme', 'dark');
+      }
+      document.getElementById('themeText').textContent = isLight ? 'LIGHT' : 'DARK';
+      document.getElementById('themeIcon').textContent = isLight ? 'light_mode' : 'dark_mode';
+    });
+
+    document.getElementById('hapticToggle').addEventListener('click', () => {
+      const current = localStorage.getItem('flux_haptic') || 'on';
+      const next = current === 'on' ? 'off' : 'on';
+      localStorage.setItem('flux_haptic', next);
+      document.getElementById('hapticToggle').textContent = next.toUpperCase();
+      if (next === 'on') haptic(50);
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+      haptic(50);
+      localStorage.removeItem('flux_token');
+      localStorage.removeItem('flux_token_expiry');
+      localStorage.removeItem('flux_session');
+      window.location.href = './';
+    });
+
+    document.getElementById('clearDataBtn').addEventListener('click', () => {
+      haptic([50, 50, 50]);
+      if (confirm('Clear all local data and reset app? This will not delete your files on Google Drive.')) {
+        localStorage.clear();
+        window.location.href = './';
+      }
+    });
+
+    document.getElementById('backBtn').addEventListener('click', () => haptic(20));
+  </script>
+</body>
+</html>

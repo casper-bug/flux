@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Drop</title>
+<meta name="description" content="Cross-device file and link syncing powered by Google Drive.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<meta name="theme-color" content="#111111">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+<script>
+  (function() {
+    const theme = localStorage.getItem('flux_theme') || 'dark';
+    if (theme === 'light') document.documentElement.classList.add('light-mode');
+  })();
+</script>
+<!-- CSP REMOVED FOR STABILITY TESTING -->
+<style>
+  /* ── TOKENS ── */
+  :root {
+    --bg: #000000;
+    --bg2: #0a0a0a;
+    --bg3: #141414;
+    --border: #333333;
+    --text: #ffffff;
+    --muted: #888888;
+    --accent: #e60000;
+    --danger: #e60000;
+  }
+  .light-mode {
+    --bg: #f8f9fa !important;
+    --bg2: #ffffff !important;
+    --bg3: #f1f3f5 !important;
+    --text: #1a1a1a !important;
+    --muted: #868e96 !important;
+    --border: #dee2e6 !important;
+  }
+
+  /* ── RESET ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1.5px, transparent 1.5px);
+    background-size: 20px 20px;
+    pointer-events: none; z-index: -1;
+  }
+  .light-mode body::before {
+    background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1.5px, transparent 1.5px) !important;
+  }
+  .light-mode #overlay { background: rgba(255,255,255,0.8) !important; }
+  .light-mode img[src="logo.svg"] { filter: invert(1); }
+
+  /* ── NAV ── */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .logo {
+    font-size: 1.2rem; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #userArea { display: flex; align-items: center; gap: 12px; }
+  #userAvatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border); display: none;
+  }
+  #userName { font-size: 0.85rem; color: var(--muted); display: none; }
+  #signInBtn, #signOutBtn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem; padding: 6px 16px;
+    border: 1px solid var(--border);
+    background: transparent; color: var(--text);
+    cursor: pointer; transition: all 0.2s; border-radius: 40px;
+  }
+  #signInBtn:hover, #signOutBtn:hover { background: var(--text); color: var(--bg); }
+  #signOutBtn {
+    display: none; align-items: center; justify-content: center;
+    width: 36px; height: 36px; padding: 0; border-radius: 50%;
+    background: var(--bg2); color: var(--muted);
+  }
+  #signOutBtn:hover { background: rgba(230,0,0,0.15); border-color: var(--danger); color: var(--danger); }
+
+  /* ── MAIN ── */
+  main { padding: 60px 20px; flex: 1; width: 100%; }
+  .main-container { max-width: 800px; margin: 0 auto; }
+
+  /* ── INPUT PILL ── */
+  .pill-layout {
+    max-width: 800px; margin: 0 auto 8px auto;
+    display: flex; align-items: flex-start; gap: 16px;
+  }
+  .refresh-btn-outer {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 50%;
+    width: 48px; height: 48px; cursor: pointer; color: var(--muted);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .refresh-btn-outer:hover { color: var(--text); border-color: var(--text); }
+  .pill-inner { flex: 1; display: flex; flex-direction: column; }
+  .omni-container {
+    width: 100%; border-radius: 100px; background: var(--bg2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+    display: flex; align-items: center;
+    padding: 0 16px; min-height: 48px;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .omni-container.drag-over { border-color: var(--accent); background: var(--bg3); }
+  #linkInput {
+    flex: 1; background: transparent; border: none;
+    color: var(--text); font-family: 'Space Mono', monospace;
+    font-size: 0.9rem; padding: 12px; outline: none;
+  }
+  #linkInput::placeholder { color: var(--muted); }
+  .omni-btn {
+    background: transparent; border: none;
+    color: var(--muted); cursor: pointer;
+    padding: 6px; display: flex; align-items: center; justify-content: center;
+    transition: color 0.2s; margin-left: 4px; border-radius: 4px;
+  }
+  .omni-btn:hover { color: var(--text); background: transparent; }
+  #fileInput { display: none; }
+
+  /* ── STORAGE PULSE ── */
+  #storagePulse {
+    font-size: 10px; font-weight: 700; color: var(--muted);
+    margin: 12px auto 32px auto;
+    text-align: center; letter-spacing: 2px; opacity: 0.7;
+    max-width: 800px;
+  }
+
+  /* ── CONFIG BANNER ── */
+  #configBanner {
+    border: 1px solid #aa8800; color: #ccaa00;
+    padding: 12px; margin-bottom: 24px;
+    font-size: 0.8rem; display: none;
+  }
+
+  /* ── UPLOAD STATES ── */
+  .item-card.uploading {
+    border-style: dashed;
+    border-color: rgba(255,255,255,0.1) !important;
+    background: rgba(255,255,255,0.03) !important;
+    animation: pulse 2s infinite ease-in-out, fadeIn 0.4s ease-out;
+  }
+  @keyframes pulse {
+    0%   { border-color: var(--border); background: var(--bg2); }
+    50%  { border-color: var(--muted);  background: var(--bg3); }
+    100% { border-color: var(--border); background: var(--bg2); }
+  }
+  .progress-mini-bg { background: var(--border); height: 2px; border-radius: 1px; width: 100%; margin-top: 8px; overflow: hidden; }
+  .progress-mini-bar { background: var(--text); height: 100%; width: 0; transition: width 0.15s linear; }
+  .upload-status { font-size: 0.75rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeOut {
+    from { opacity: 1; transform: scale(1);    max-height: 120px; margin-bottom: 8px; }
+    to   { opacity: 0; transform: scale(0.97); max-height: 0;     margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+  }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  /* ── DROP ZONE ── */
+  #dropZone {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+    z-index: 2000; display: none; align-items: center; justify-content: center;
+    border: 2px dashed var(--text); margin: 24px; border-radius: 20px;
+    pointer-events: none; transition: opacity 0.3s;
+  }
+  .drop-content { text-align: center; }
+  .drop-content p { margin-top: 16px; letter-spacing: 2px; font-size: 0.9rem; }
+
+  /* ── LIST AREA ── */
+  .section-title {
+    font-size: 0.8rem; color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between;
+    text-transform: uppercase; letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px; margin-bottom: 24px;
+  }
+  .spinning .material-symbols-outlined { animation: spin 1s linear infinite; }
+
+  .item-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px; }
+  .item-card {
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 16px;
+    background: var(--bg2);
+    opacity: 0.8;
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    animation: fadeIn 0.4s ease-out;
+    min-height: 72px;
+  }
+  .item-card:hover { border-color: var(--muted); }
+  .item-card.deleting { animation: fadeOut 0.3s forwards ease-in; pointer-events: none; }
+
+  .empty-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; color: var(--muted);
+    font-size: 0.9rem; letter-spacing: 1px;
+    padding: 60px 40px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .item-icon { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .item-info { flex: 1; min-width: 0; cursor: pointer; }
+  .item-name { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px; }
+  .item-meta { font-size: 0.75rem; color: var(--muted); }
+  .item-actions { display: flex; gap: 8px; }
+
+  .action-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer;
+    padding: 6px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; border-radius: 6px;
+  }
+  .action-btn:hover { color: var(--text); border-color: var(--text); }
+  .action-btn.delete-btn:hover { background: rgba(230,0,0,0.15); color: var(--danger); border-color: var(--danger); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg);
+    padding: 10px 20px; font-size: 0.85rem;
+    opacity: 0; transition: all 0.3s; pointer-events: none;
+    z-index: 1000; display: flex; align-items: center; gap: 10px;
+    border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+  #toast.error { background: var(--danger); color: #fff; }
+  #toast .material-symbols-outlined { font-size: 1.2rem; }
+
+  /* ── SIGN-IN OVERLAY ── */
+  #overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(8px); z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 1; transition: opacity 0.3s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  body.has-session #overlay { display: none !important; }
+  .overlay-card { 
+    background: var(--bg2);
+    border: 1px solid var(--border); padding: 40px; text-align: center; max-width: 400px; width: 90%; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .overlay-logo { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; letter-spacing: 2px; }
+  .google-btn {
+    background: var(--text); color: var(--bg); border: none;
+    padding: 12px 24px; font-family: 'Space Mono', monospace;
+    font-size: 0.9rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .google-btn:hover { opacity: 0.8; }
+  .overlay-note { font-size: 0.75rem; color: var(--muted); margin-top: 24px; }
+
+  /* ── MODAL ── */
+  #modalOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px); z-index: 2000;
+    display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  #modalOverlay.active { display: flex; opacity: 1; }
+  .modal-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    width: 90%; max-width: 400px; padding: 32px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    transform: translateY(20px); transition: transform 0.3s;
+  }
+  #modalOverlay.active .modal-card { transform: translateY(0); }
+  .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px; }
+  .modal-body {
+    font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; line-height: 1.6;
+    word-break: break-all; overflow-wrap: anywhere;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+  .modal-btn {
+    font-family: 'Space Mono', monospace; font-size: 0.8rem;
+    padding: 12px 24px; cursor: pointer; transition: all 0.2s;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg2); color: var(--text);
+    font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .modal-btn:hover { opacity: 0.85; transform: scale(1.02); }
+  .modal-btn.cancel { background: transparent; }
+  .modal-btn.confirm { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .modal-btn.danger  { background: var(--danger); border-color: var(--danger); color: #fff; }
+  #modalConfirmBtn   { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  /* ── FOOTER ── */
+  footer { padding: 24px 0; border-top: 1px solid var(--border); margin: auto 16px 0 16px; }
+  .footer-links { 
+    display: flex; justify-content: flex-end; gap: 24px; 
+    font-size: 0.7rem; letter-spacing: 1px; color: var(--muted);
+    max-width: 800px; margin: 0 auto;
+  }
+  .footer-links a { text-decoration: none; color: var(--muted); transition: color 0.2s; }
+  .footer-links a:hover { color: var(--text); }
+
+  /* ── SCROLL TOP ── */
+  .floating-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--text); color: var(--bg);
+    border: none; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 90;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .floating-btn:hover { transform: scale(1.1) translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
+  .floating-btn:active { transform: scale(0.95); }
+
+  /* ── MOBILE ── */
+  @media (max-width: 600px) {
+    nav { padding: 12px 16px; }
+    .logo { font-size: 1rem; gap: 6px; }
+    .logo img { width: 18px !important; height: 18px !important; }
+    #userArea { gap: 8px; }
+    #userName { display: none !important; }
+    #userAvatar { width: 28px; height: 28px; object-fit: cover; }
+    #signOutBtn {
+      width: auto; height: auto; padding: 5px 12px;
+      border-radius: 40px; background: transparent;
+      color: var(--muted); font-size: 0.7rem;
+      display: flex; align-items: center; gap: 4px;
+    }
+    #signOutBtn .material-symbols-outlined { font-size: 1rem; }
+    #signInBtn { padding: 5px 12px; font-size: 0.7rem; }
+
+    main { padding: 24px 16px 40px; }
+
+    .pill-layout { gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+    .refresh-btn-outer { width: 48px; height: 48px; }
+    .refresh-btn-outer .material-symbols-outlined { font-size: 1.1rem; }
+    .omni-container { height: 48px; min-height: unset; padding: 0 10px; }
+    #linkInput { font-size: 0.8rem; padding: 0 6px; height: 100%; }
+    .omni-btn { padding: 6px 8px; margin-left: 4px; }
+    .omni-btn .material-symbols-outlined { font-size: 1.1rem; }
+
+    #storagePulse { font-size: 9px; }
+
+    .section-title { font-size: 0.65rem; letter-spacing: 1.5px; padding-bottom: 8px; margin-bottom: 16px; }
+
+    .item-card { padding: 10px 12px; gap: 10px; min-height: 60px; }
+    .item-icon .material-symbols-outlined { font-size: 1.2rem; }
+    .item-name { font-size: 0.8rem; }
+    .item-meta { font-size: 0.68rem; }
+
+    .item-actions { gap: 4px; }
+    .action-btn { padding: 5px; }
+    .action-btn .material-symbols-outlined { font-size: 1rem; }
+  }
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<script>
+  (function() {
+    if (localStorage.getItem('flux_session')) document.body.classList.add('has-session');
+  })();
+  function haptic(v = 20) {
+    if (localStorage.getItem('flux_haptic') === 'off') return;
+    if (navigator.vibrate) navigator.vibrate(v);
+  }
+</script>
+
+<!-- Sign-in overlay -->
+<div id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-logo">
+      <img src="logo.svg" style="width:32px;height:32px;vertical-align:middle;margin-right:8px;" alt="logo">FLUX
+    </div>
+    <p style="margin-bottom:24px;font-size:0.85rem;color:var(--muted);">Personal File &amp; Link Sharing</p>
+    <button class="google-btn" id="overlaySignIn">Sign In</button>
+    <p class="overlay-note">All files and links stay within your own Google Drive.</p>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <div class="logo">
+    <img src="logo.svg" style="width:20px;height:20px;" alt="logo">FLUX
+  </div>
+  <div id="userArea">
+    <img id="userAvatar" alt="avatar" referrerpolicy="no-referrer">
+    <span id="userName"></span>
+    <button id="signInBtn">Sign In</button>
+    <a href="settings.html" id="settingsBtn" title="Settings" style="display:none; color:var(--muted); text-decoration:none; align-items:center; justify-content:center; width:32px; height:32px;">
+      <span class="material-symbols-outlined" style="font-size:1.3rem;">settings</span>
+    </a>
+  </div>
+</nav>
+
+<!-- Drop zone overlay -->
+<div id="dropZone">
+  <div class="drop-content">
+    <span class="material-symbols-outlined" style="font-size:4rem;">upload_file</span>
+    <p>DROP TO SYNC</p>
+  </div>
+</div>
+
+<!-- Main -->
+<main>
+  <div class="main-container">
+    <div id="configBanner">Setup required: Replace YOUR_GOOGLE_CLIENT_ID in app.js</div>
+
+    <div class="pill-layout">
+      <button id="refreshBtn" class="refresh-btn-outer" title="Refresh">
+        <span class="material-symbols-outlined" style="font-size:1.3rem;">refresh</span>
+      </button>
+      <div class="pill-inner">
+        <div class="omni-container">
+          <input type="file" id="fileInput" multiple style="display:none;">
+          <input type="text" id="linkInput" placeholder="Paste link or drop files...">
+          <button id="browseBtn" class="omni-btn" title="Upload File">
+            <span class="material-symbols-outlined">attachment</span>
+          </button>
+          <button id="saveLinkBtn" class="omni-btn" title="Send">
+            <span class="material-symbols-outlined">send</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="storagePulse"></div>
+
+    <div class="section-title" id="textSectionTitle"><span>TEXT</span></div>
+    <div id="textList" class="item-list"></div>
+
+    <div class="section-title" id="fileSectionTitle"><span>FILES</span></div>
+    <div id="fileList" class="item-list"></div>
+
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <span class="material-symbols-outlined" style="font-size:2rem;opacity:0.2;margin-bottom:12px;">upload_file</span>
+      No Items Yet
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-links">
+    <a href="about.html">ABOUT</a>
+    <a href="privacy.html">PRIVACY</a>
+    <a href="terms.html">TERMS</a>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div id="toast">
+  <span class="material-symbols-outlined" id="toastIcon"></span>
+  <span id="toastText"></span>
+</div>
+
+<!-- Scroll to top -->
+<button id="scrollTopBtn" class="floating-btn" title="Back to Top">
+  <span class="material-symbols-outlined">arrow_upward</span>
+</button>
+
+<!-- Modal -->
+<div id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitle">Confirm Action</div>
+    <div class="modal-body" id="modalBody" style="max-height:60vh;overflow-y:auto;">Are you sure?</div>
+    <div class="modal-actions" id="modalActions">
+      <button id="modalCancelBtn" class="modal-btn cancel">Cancel</button>
+      <button id="modalExtraBtn" class="modal-btn" style="display:none;background:var(--bg3);margin-right:auto;">Keep Both</button>
+      <button id="modalConfirmBtn" class="modal-btn confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js?v=114').then(reg => {
+      reg.onupdatefound = () => {
+        const installingWorker = reg.installing;
+        installingWorker.onstatechange = () => {
+          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Only show if we actually have the toast function ready
+            if (window.showToast) showToast('Update available! Refresh to apply.', true, 'system_update');
+          }
+        };
+      };
+    }).catch(console.error);
+  }
+</script>
+<script src="app.js?v=114"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service | Flux</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050505; --bg2: #0a0a0a; --text: #f0f0f0; --muted: #888; --border: #222; --accent: #fff;
+    }
+    .light-mode {
+      --bg: #f8f9fa !important; --bg2: #ffffff !important; --text: #1a1a1a !important; --muted: #666 !important; --border: #ddd !important; --accent: #000 !important;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Space Mono', monospace; line-height: 1.6;
+      padding: 40px 20px; max-width: 800px; margin: 0 auto;
+      position: relative;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1.5px, transparent 1.5px);
+      background-size: 20px 20px; pointer-events: none; z-index: -1;
+    }
+    .light-mode body::before {
+      background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1.5px, transparent 1.5px) !important;
+    }
+    .light-mode img[src="logo.svg"] { filter: invert(1); }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--muted); text-decoration: none; font-size: 0.8rem;
+      margin-bottom: 40px; transition: color 0.2s;
+    }
+    .back-btn:hover { color: var(--text); }
+    h1 { font-size: 1.5rem; margin-bottom: 24px; letter-spacing: 2px; }
+    h2 { font-size: 1.1rem; margin: 32px 0 16px; color: var(--accent); letter-spacing: 1px; }
+    p { margin-bottom: 16px; color: var(--muted); font-size: 0.9rem; }
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 32px; border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+<script>
+  if (localStorage.getItem('flux_theme') === 'light') {
+    document.documentElement.classList.add('light-mode');
+    window.addEventListener('DOMContentLoaded', () => document.body.classList.add('light-mode'));
+  }
+</script>
+  <a href="./" class="back-btn">← BACK TO FLUX</a>
+  
+  <div class="card">
+    <h1>TERMS OF SERVICE</h1>
+    <p>Last Updated: April 2026</p>
+
+    <h2>1. ACCEPTANCE OF TERMS</h2>
+    <p>By using Flux, you agree to these terms. Flux is a "utility-first" application provided "as is" without any warranties of any kind.</p>
+
+    <h2>2. USE OF SERVICE</h2>
+    <p>You are solely responsible for the content you upload and share via Flux. You must comply with Google Drive's own terms of service and acceptable use policies.</p>
+
+    <h2>3. LIMITATION OF LIABILITY</h2>
+    <p>Flux is a client-side tool that interacts with your Google account. We are not responsible for any data loss, corruption, or unauthorized access resulting from your use of the application or the Google Drive service.</p>
+
+    <h2>4. SERVICE AVAILABILITY</h2>
+    <p>Since Flux relies on the Google Drive API, its availability depends entirely on Google's services and your network connectivity.</p>
+
+    <h2>5. MODIFICATIONS</h2>
+    <p>Flux is an open-source project. We reserve the right to modify or discontinue the application at any time. Your continued use of the application constitutes acceptance of any changes.</p>
+  </div>
+</body>
+</html>

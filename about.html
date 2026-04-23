@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Flux</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050505; --bg2: #0a0a0a; --text: #f0f0f0; --muted: #888; --border: #222; --accent: #fff;
+    }
+    .light-mode {
+      --bg: #f8f9fa !important; --bg2: #ffffff !important; --text: #1a1a1a !important; --muted: #666 !important; --border: #ddd !important; --accent: #000 !important;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Space Mono', monospace; line-height: 1.6;
+      padding: 40px 20px; max-width: 800px; margin: 0 auto;
+      position: relative;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1.5px, transparent 1.5px);
+      background-size: 20px 20px; pointer-events: none; z-index: -1;
+    }
+    .light-mode body::before {
+      background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1.5px, transparent 1.5px) !important;
+    }
+    .light-mode img[src="logo.svg"] { filter: invert(1); }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--muted); text-decoration: none; font-size: 0.8rem;
+      margin-bottom: 40px; transition: color 0.2s;
+    }
+    .back-btn:hover { color: var(--text); }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; letter-spacing: 2px; }
+    .tagline { font-size: 0.85rem; color: var(--muted); margin-bottom: 32px; text-transform: uppercase; letter-spacing: 1px; }
+    h2 { font-size: 1.1rem; margin: 32px 0 16px; color: var(--accent); letter-spacing: 1px; }
+    p { margin-bottom: 16px; color: var(--muted); font-size: 0.9rem; }
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 32px; border-radius: 12px;
+    }
+    .logo-img { width: 64px; height: 64px; margin-bottom: 24px; filter: grayscale(1); }
+    .footer-note { margin-top: 40px; text-align: center; font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+<script>
+  if (localStorage.getItem('flux_theme') === 'light') {
+    document.documentElement.classList.add('light-mode');
+    window.addEventListener('DOMContentLoaded', () => document.body.classList.add('light-mode'));
+  }
+</script>
+  <a href="./" class="back-btn">← BACK TO DASHBOARD</a>
+  
+  <div class="card">
+    <img src="logo.svg" alt="Flux Logo" class="logo-img">
+    <h1>FLUX</h1>
+    <p class="tagline">Personal File & Link Synchronization</p>
+
+    <h2>THE CONCEPT</h2>
+    <p>Flux was built to solve a simple problem: moving a file or a URL from one device to another without using email, Slack, or a privacy-invasive third-party service.</p>
+    <p>Instead of building another storage silo, Flux turns your existing Google Drive into a personal "drop zone".</p>
+
+    <h2>HOW IT WORKS</h2>
+    <p>Flux uses your own Google Drive storage. When you upload a file, it's sent directly to a folder called <code>FluxSpace</code> in your Drive. The app uses the <code>drive.file</code> scope, meaning it only has access to the files it creates.</p>
+    <p>There is no backend server. All logic happens in your browser using the Google Drive API v3.</p>
+
+    <h2>KEY FEATURES</h2>
+    <p>• Drag & drop files and folders<br>
+       • Instant link saving and clipboard sync<br>
+       • PWA support for mobile home screen access<br>
+       • Offline-first architecture via Service Workers<br>
+       • Keyed DOM-diff rendering for high performance</p>
+
+    
+
+  <div class="footer-note">
+  BUILT FOR SPEED & PRIVACY
+  </div>
+</body>
+</html>
