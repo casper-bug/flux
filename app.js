@@ -25,11 +25,6 @@ const dropZone      = _id('dropZone');
 const linkInput     = _id('linkInput');
 const saveLinkBtn   = _id('saveLinkBtn');
 
-const uploadProgress= _id('uploadProgress');
-const uploadBar     = _id('uploadProgressBar');
-const uploadLbl     = _id('uploadProgressLabel');
-const uploadPct     = _id('uploadProgressPercent');
-
 const textList      = _id('textList');
 const fileList      = _id('fileList');
 const textSection   = _id('textSectionTitle');
@@ -50,7 +45,7 @@ const modalActions  = _id('modalActions');
 const aboutLink     = _id('aboutLink');
 
 // ─── Init ────────────────────────────────────────────────────
-window.addEventListener('load', () => {
+document.addEventListener('DOMContentLoaded', () => {
   try {
     if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') {
       configBanner.style.display = 'block';
@@ -542,32 +537,50 @@ async function handleFiles(files) {
   const fileArray = Array.from(files);
   if (!fileArray.length) return;
   
-  uploadProgress.style.display = 'block';
-  
+  fileSection.style.display = 'flex'; // Ensure section is visible
+  emptyState.style.display = 'none';
+
   for (let i = 0; i < fileArray.length; i++) {
     const f = fileArray[i];
-    uploadLbl.textContent = `Uploading ${f.name} (${i+1}/${fileArray.length})...`;
+    
+    // Create inline placeholder
+    const el = document.createElement('div');
+    el.className = 'item-card uploading';
+    el.innerHTML = `
+      <div class="item-icon"><span class="material-symbols-outlined">${getFileIcon(f.name)}</span></div>
+      <div class="item-info">
+        <div class="item-name">${escHtml(f.name)}</div>
+        <div class="progress-mini-bg"><div class="progress-mini-bar"></div></div>
+      </div>
+      <div class="item-actions">
+        <span style="font-size: 0.6rem; color: var(--muted);">UPLOADING</span>
+      </div>
+    `;
+    fileList.prepend(el);
+
     try {
-      await uploadSingleFile(f);
+      await uploadSingleFile(f, el);
+      el.remove(); // Remove placeholder once actual file is loaded
     } catch(e) {
       showToast(`Failed to upload ${f.name}`, false);
+      el.remove();
     }
   }
   
-  uploadProgress.style.display = 'none';
-  uploadBar.style.width = '0%';
   fileInput.value = ''; // reset
   showToast('Upload complete', true);
   // Multi-stage refresh to account for Google Drive indexing lag
-  setTimeout(loadItems, 1500);
+  setTimeout(loadItems, 1000);
   setTimeout(loadItems, 5000);
 }
 
-function uploadSingleFile(file) {
+function uploadSingleFile(file, placeholderEl) {
   return new Promise(async (resolve, reject) => {
     try {
       if (!fluxFolderId) throw new Error('Drive folder not initialized');
       
+      const miniBar = placeholderEl.querySelector('.progress-mini-bar');
+
       // Step 1: Create file metadata
       const metadata = { name: file.name, parents: [fluxFolderId] };
       const res = await fetch('https://www.googleapis.com/drive/v3/files', {
@@ -589,10 +602,9 @@ function uploadSingleFile(file) {
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       
       xhr.upload.onprogress = e => {
-        if (e.lengthComputable) {
+        if (e.lengthComputable && miniBar) {
           const pct = Math.floor(e.loaded / e.total * 100);
-          uploadBar.style.width = pct + '%';
-          uploadPct.textContent = pct + '%';
+          miniBar.style.width = pct + '%';
         }
       };
       
