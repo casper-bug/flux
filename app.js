@@ -60,7 +60,6 @@ window.addEventListener('load', () => {
   loadCachedItems();
   
   loadGISScript();
-  initGIS();
 });
 
 // ─── Authentication Recovery ─────────────────────────────────
@@ -105,10 +104,11 @@ function loadGISScript() {
 let tokenClient;
 function initGIS() {
   if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') return;
-  if (typeof google === 'undefined') {
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
     setTimeout(initGIS, 500);
     return;
   }
+  if (tokenClient) return; // Already initialized
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
@@ -186,6 +186,7 @@ function updateUserUI(info, showWelcome = false) {
   } else {
     userAvatar.style.display = 'none';
   }
+  userName.textContent = name;
   userName.style.display = 'block';
   refreshBtn.style.display = 'inline-flex';
   signInBtn.style.display = 'none';
