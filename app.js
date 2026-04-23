@@ -174,8 +174,8 @@ function updateUserUI(info, showWelcome = false) {
   } else {
     userAvatar.style.display = 'none';
   }
-  userName.textContent = name;
   userName.style.display = 'block';
+  refreshBtn.style.display = 'inline-flex';
   signInBtn.style.display = 'none';
   signOutBtn.style.display = 'inline-flex';
   if (showWelcome) showToast('Welcome, ' + name, true);
@@ -191,6 +191,7 @@ function signOut() {
   localStorage.removeItem('flux_user_info');
   userAvatar.style.display = 'none';
   userName.style.display = 'none';
+  refreshBtn.style.display = 'none';
   signInBtn.style.display = 'inline-flex';
   signOutBtn.style.display = 'none';
   overlay.classList.remove('hidden');
@@ -316,12 +317,11 @@ function renderItems() {
 
   if (!items.length) {
     textSection.style.display = 'none';
-    fileSection.style.display = 'flex'; // Keep refresh button visible
+    fileSection.style.display = 'none';
     emptyState.style.display = 'block';
     return;
   }
   emptyState.style.display = 'none';
-  fileSection.style.display = 'flex';
 
   items.forEach(file => {
     const isText = file.mimeType === 'application/vnd.flux.link' || (file.appProperties && file.appProperties.url);
@@ -441,6 +441,7 @@ function renderItems() {
   });
 
   textSection.style.display = textCount > 0 ? 'flex' : 'none';
+  fileSection.style.display = fileCount > 0 ? 'flex' : 'none';
 }
 
 // ─── Uploads (Files & Folders) ───────────────────────────────
