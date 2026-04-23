@@ -1,87 +1,448 @@
-const CACHE_NAME = 'flux-cache-v19';
-const urlsToCache = [
-  './',
-  './index.html',
-  './app.js',
-  './manifest.json',
-  './icon.svg',
-  './logo.svg'
-];
-
-self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME && key !== 'flux-share-target') {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  // Handle Web Share Target POST requests
-  if (event.request.method === 'POST' && event.request.url.includes('share_target=1')) {
-    event.respondWith(
-      (async () => {
-        const formData = await event.request.formData();
-        const sharedData = {
-          title: formData.get('title') || '',
-          text: formData.get('text') || '',
-          url: formData.get('url') || '',
-          files: formData.getAll('files')
-        };
-        
-        // Store in a temporary cache that the main page can read
-        const cache = await caches.open('flux-share-target');
-        
-        // Map files to an index-based storage to avoid collisions
-        const fileManifest = sharedData.files.map((file, index) => ({
-          name: file.name,
-          type: file.type,
-          index: index
-        }));
-
-        await cache.put('/shared-data', new Response(JSON.stringify({
-          ...sharedData,
-          files: fileManifest
-        })));
-        
-        // Store the actual file blobs using the index
-        for (let i = 0; i < sharedData.files.length; i++) {
-          await cache.put(`/shared-files/${i}`, new Response(sharedData.files[i]));
-        }
-
-        return Response.redirect('./index.html?share=1', 303);
-      })()
-    );
-    return;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Drop</title>
+<meta name="description" content="Cross-device file and link syncing powered by Google Drive.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<meta name="theme-color" content="#111111">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGIS()"></script>
+<style>
+  :root {
+    --bg: #000000;
+    --bg2: #0a0a0a;
+    --bg3: #141414;
+    --border: #333333;
+    --text: #ffffff;
+    --muted: #888888;
+    --accent: #e60000;
+    --danger: #e60000;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1.5px, transparent 1.5px);
+    background-size: 20px 20px;
+    pointer-events: none;
+    z-index: -1;
   }
 
-  // Only intercept same-origin requests to avoid breaking API calls
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  /* NAV */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: #000;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .logo {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #userArea {
+    display: flex; align-items: center; gap: 12px;
+  }
+  #userAvatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border);
+    display: none;
+  }
+  #userName {
+    font-size: 0.85rem; color: var(--muted);
+    display: none;
+  }
+  #signInBtn, #signOutBtn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 40px;
+  }
+  #signInBtn:hover, #signOutBtn:hover { background: var(--text); color: var(--bg); }
+  #signOutBtn { 
+    display: none; 
+    border-color: rgba(230, 0, 0, 0.4);
+    color: #ff5555;
+    background: rgba(230, 0, 0, 0.05);
+  }
+  #signOutBtn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  /* MAIN */
+  main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 20px;
+  }
+
+  /* OMNI INPUT */
+  .omni-container {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 8px 16px;
+    margin-bottom: 40px;
+    position: relative;
+    transition: border-color 0.2s;
+    border-radius: 40px;
+  }
+  .omni-container.drag-over {
+    border-color: var(--accent);
+    background: var(--bg3);
+  }
+  #linkInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    padding: 12px;
+    outline: none;
+  }
+  #linkInput::placeholder { color: var(--muted); }
+  .omni-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    padding: 8px 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    margin-left: 8px;
+    border-radius: 40px;
+  }
+  .omni-btn:hover { background: var(--text); color: var(--bg); }
+  #fileInput { display: none; }
+
+  /* PROGRESS */
+  .progress-wrap {
+    margin-top: -20px;
+    margin-bottom: 40px;
+    display: none;
+    border: 1px solid var(--border);
+    padding: 12px;
+    font-size: 0.8rem;
+  }
+  .progress-bar-bg {
+    height: 2px;
+    background: var(--border);
+    margin-bottom: 8px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.2s;
+  }
+
+  /* LIST AREA */
+  .section-title {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .refresh-btn {
+    background: transparent; border: none; color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center;
+  }
+  .refresh-btn:hover { color: var(--text); }
+  .refresh-btn:hover { color: var(--text); }
+  .spinning .material-symbols-outlined { animation: spin 1s linear infinite; }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  #itemsList { display: flex; flex-direction: column; gap: 8px; }
+  .item-card {
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 16px;
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+  }
+  .item-card:hover { border-color: var(--muted); }
+  .item-icon {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+  }
+  .item-info { flex: 1; min-width: 0; cursor: pointer; }
+  .item-name {
+    font-size: 0.9rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin-bottom: 4px;
+  }
+  .item-meta { font-size: 0.75rem; color: var(--muted); }
   
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) return response;
-        return fetch(event.request).then(fetchRes => {
-          return caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, fetchRes.clone());
-            return fetchRes;
-          });
-        });
-      })
-  );
-});
+  .item-actions { display: flex; gap: 8px; }
+  .action-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer;
+    padding: 6px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .action-btn:hover { color: var(--text); border-color: var(--text); }
+  .action-btn.delete-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg);
+    padding: 10px 20px; font-size: 0.85rem;
+    opacity: 0; transition: all 0.3s; pointer-events: none;
+    z-index: 1000;
+    display: flex; align-items: center; gap: 10px;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+  #toast.error { background: var(--danger); color: #fff; }
+  #toast .material-symbols-outlined { font-size: 1.2rem; }
+
+  /* OVERLAY */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 100; display: flex; align-items: center; justify-content: center;
+    opacity: 1; transition: opacity 0.3s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  .overlay-card {
+    border: 1px solid var(--border); padding: 40px; text-align: center;
+    max-width: 400px; width: 90%;
+  }
+  .overlay-logo { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; letter-spacing: 2px; }
+  .google-btn {
+    background: var(--text); color: var(--bg); border: none; padding: 12px 24px;
+    font-family: 'Space Mono', monospace; font-size: 0.9rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .google-btn:hover { opacity: 0.8; }
+  .overlay-note { font-size: 0.75rem; color: var(--muted); margin-top: 24px; }
+
+  /* CONFIG BANNER */
+  #configBanner {
+    border: 1px solid #aa8800; color: #ccaa00; padding: 12px; margin-bottom: 24px;
+    font-size: 0.8rem; display: none;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center; padding: 60px 40px; color: var(--muted); font-size: 0.85rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+  
+  
+  /* MODAL */
+  #modalOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px); z-index: 2000;
+    display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  #modalOverlay.active { display: flex; opacity: 1; }
+  .modal-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    width: 90%; max-width: 400px; padding: 32px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    transform: translateY(20px); transition: transform 0.3s;
+  }
+  #modalOverlay.active .modal-card { transform: translateY(0); }
+  .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px; color: var(--text); }
+  .modal-body { font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+  .modal-btn {
+    font-family: 'Space Mono', monospace; font-size: 0.8rem;
+    padding: 10px 20px; cursor: pointer; transition: all 0.2s;
+    border-radius: 4px;
+  }
+  .modal-btn.cancel { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .modal-btn.confirm { background: var(--text); border: 1px solid var(--text); color: var(--bg); }
+  .modal-btn.danger { background: var(--danger); border: 1px solid var(--danger); color: #fff; }
+  .modal-btn:hover { opacity: 0.8; transform: scale(1.02); }
+
+  /* MOBILE OPTIMIZATIONS */
+  @media (max-width: 600px) {
+    nav { padding: 12px 16px; }
+    .logo { font-size: 1rem; gap: 6px; }
+    .logo img { width: 18px !important; height: 18px !important; }
+    #userArea { gap: 8px; }
+    #userName { display: none !important; } /* Hide name on mobile to save space */
+    #userAvatar { width: 28px; height: 28px; }
+    #signInBtn, #signOutBtn { padding: 6px 12px; font-size: 0.7rem; }
+    #signOutBtn span:not(.material-symbols-outlined) { display: none; }
+    #signOutBtn { padding: 6px; border-radius: 50%; color: var(--danger); border-color: rgba(230,0,0,0.3); }
+    #signOutBtn .material-symbols-outlined { font-size: 1.2rem; }
+    
+    main { padding: 30px 16px; }
+    .omni-container { padding: 4px 8px; margin-bottom: 30px; }
+    #linkInput { font-size: 0.8rem; padding: 10px; }
+    .omni-btn { padding: 6px 10px; margin-left: 4px; }
+    .omni-btn .material-symbols-outlined { font-size: 1.2rem; }
+    
+    .section-title { font-size: 0.7rem; }
+    .item-card { padding: 10px 12px; gap: 12px; }
+    .item-name { font-size: 0.85rem; }
+    .item-meta { font-size: 0.7rem; }
+  }
+
+  /* FOOTER */
+  footer {
+    padding: 40px 20px 80px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+  .footer-links {
+    display: flex; justify-content: center; gap: 24px;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .footer-links a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+  .footer-links a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Sign-in overlay -->
+<div id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-logo">
+      <img src="logo.svg" style="width: 32px; height: 32px; vertical-align: middle; margin-right: 8px;" alt="logo">FLUX
+    </div>
+    <p style="margin-bottom: 24px; font-size: 0.85rem; color: var(--muted);">Personal File & Link Sharing</p>
+    <button class="google-btn" id="overlaySignIn">
+      Sign In
+    </button>
+    <p class="overlay-note">All files and links stay within your own Google Drive.</p>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <div class="logo">
+    <img src="logo.svg" style="width: 20px; height: 20px;" alt="logo">
+    FLUX
+  </div>
+  <div id="userArea">
+    <img id="userAvatar" alt="avatar" referrerpolicy="no-referrer">
+    <span id="userName"></span>
+    <button id="signInBtn">Sign In</button>
+    <button id="signOutBtn" title="Sign Out" style="background: var(--bg3); padding: 8px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; display: none; align-items: center; justify-content: center; color: var(--text);">
+      <span class="material-symbols-outlined" style="font-size: 1.2rem;">logout</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Main -->
+<main>
+  <div id="configBanner">
+    Setup required: Replace YOUR_GOOGLE_CLIENT_ID in app.js
+  </div>
+
+  <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 24px;">
+    <button id="refreshBtn" class="refresh-btn" title="Refresh List" style="background: var(--bg3); padding: 10px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text);">
+      <span class="material-symbols-outlined" style="font-size: 1.4rem;">refresh</span>
+    </button>
+    <div class="omni-container" id="dropZone" style="flex: 1; margin-bottom: 0;">
+      <input type="file" id="fileInput" multiple>
+      <input type="text" id="linkInput" placeholder="Paste a link, code, or drop files here..." autocomplete="off">
+      <button class="omni-btn" id="browseBtn" title="Select Files"><span class="material-symbols-outlined">attach_file</span></button>
+      <button class="omni-btn" id="saveLinkBtn" title="Save Content"><span class="material-symbols-outlined">send</span></button>
+    </div>
+  </div>
+
+  <div class="progress-wrap" id="uploadProgress">
+    <div class="progress-bar-bg"><div class="progress-bar" id="uploadProgressBar"></div></div>
+    <div id="uploadProgressLabel">Uploading...</div>
+  </div>
+
+  <div class="section-title" id="textSectionTitle">
+    <span>TEXT</span>
+  </div>
+  <div id="textList" style="margin-bottom: 40px; display: flex; flex-direction: column; gap: 8px;">
+    <!-- Text items here -->
+  </div>
+
+  <div class="section-title" id="fileSectionTitle" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 24px;">
+    <span>FILES</span>
+  </div>
+  
+  <div id="fileList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px;">
+    <!-- File items here -->
+  </div>
+
+  <div class="empty-state" id="emptyState" style="display: none;">
+    <span class="material-symbols-outlined" style="display: block; margin-bottom: 12px; font-size: 2rem; opacity: 0.2;">upload_file</span>
+    No Items Yet
+  </div>
+</main>
+
+<footer>
+  <div class="footer-links">
+    <a id="aboutLink">ABOUT</a>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div id="toast">
+  <span class="material-symbols-outlined" id="toastIcon"></span>
+  <span id="toastText"></span>
+</div>
+
+
+<!-- Custom Modal -->
+<div id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitle">Confirm Action</div>
+    <div class="modal-body" id="modalBody" style="max-height: 60vh; overflow-y: auto;">Are you sure you want to proceed?</div>
+    <div class="modal-actions" id="modalActions">
+      <button class="modal-btn cancel" id="modalCancelBtn">Cancel</button>
+      <button class="modal-btn confirm" id="modalConfirmBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(console.error);
+  }
+</script>
+<script src="app.js?v=21"></script>
+<div style="position:fixed; bottom:5px; right:10px; font-size:10px; color:#333; pointer-events:none;">v21</div>
+</body>
+</html>
