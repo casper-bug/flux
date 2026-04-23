@@ -140,25 +140,12 @@
   #fileInput { display: none; }
 
   /* PROGRESS */
-  .progress-wrap {
-    margin-top: -20px;
-    margin-bottom: 40px;
-    display: none;
-    border: 1px solid var(--border);
-    padding: 12px;
-    font-size: 0.8rem;
-  }
-  .progress-bar-bg {
-    height: 2px;
-    background: var(--border);
-    margin-bottom: 8px;
-  }
-  .progress-bar {
-    height: 100%;
-    background: var(--accent);
-    width: 0%;
-    transition: width 0.2s;
-  }
+  .progress-wrap { display: none; margin-bottom: 32px; background: var(--bg2); padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-top: -20px; }
+  .progress-bar-bg { background: var(--bg3); height: 2px; border-radius: 1px; overflow: hidden; margin-bottom: 8px; position: relative; }
+  .progress-bar { background: var(--text); height: 100%; width: 0; transition: width 0.1s linear; box-shadow: 0 0 10px var(--text); }
+  .progress-info { display: flex; justify-content: space-between; align-items: center; }
+  #uploadProgressLabel { font-size: 0.7rem; color: var(--text); font-weight: 700; }
+  #uploadProgressPercent { font-size: 0.7rem; color: var(--muted); }
 
   /* LIST AREA */
   .section-title {
@@ -388,7 +375,10 @@
 
   <div class="progress-wrap" id="uploadProgress">
     <div class="progress-bar-bg"><div class="progress-bar" id="uploadProgressBar"></div></div>
-    <div id="uploadProgressLabel">Uploading...</div>
+    <div class="progress-info">
+      <div id="uploadProgressLabel">Uploading...</div>
+      <div id="uploadProgressPercent">0%</div>
+    </div>
   </div>
 
   <div class="section-title" id="textSectionTitle">
@@ -442,7 +432,7 @@
     navigator.serviceWorker.register('sw.js').catch(console.error);
   }
 </script>
-<script src="app.js?v=21"></script>
-<div style="position:fixed; bottom:5px; right:10px; font-size:10px; color:#333; pointer-events:none;">v21</div>
+<script src="app.js?v=22"></script>
+<div style="position:fixed; bottom:5px; right:10px; font-size:10px; color:#333; pointer-events:none;">v22</div>
 </body>
 </html>
