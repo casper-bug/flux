@@ -59,7 +59,7 @@ window.addEventListener('load', () => {
   // Load cached items for instant UI
   loadCachedItems();
   
-  loadGISScript();
+  initGIS();
 });
 
 // ─── Authentication Recovery ─────────────────────────────────
@@ -94,12 +94,6 @@ function recoverSession() {
 }
 
 // ─── Google Identity Services ────────────────────────────────
-function loadGISScript() {
-  const s = document.createElement('script');
-  s.src = 'https://accounts.google.com/gsi/client';
-  s.onload = initGIS;
-  document.head.appendChild(s);
-}
 
 let tokenClient;
 function initGIS() {
@@ -124,7 +118,7 @@ function initGIS() {
 function signIn() {
   if (!tokenClient) {
     initGIS();
-    showToast('Connecting to Google...', true, 'sync');
+    showToast('Connecting to Google... Try again in a second.', true, 'sync');
     return;
   }
   tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -182,7 +176,6 @@ function updateUserUI(info, showWelcome = false) {
   }
   userName.textContent = name;
   userName.style.display = 'block';
-  refreshBtn.style.display = 'inline-flex';
   signInBtn.style.display = 'none';
   signOutBtn.style.display = 'inline-flex';
   if (showWelcome) showToast('Welcome, ' + name, true);
@@ -198,7 +191,6 @@ function signOut() {
   localStorage.removeItem('flux_user_info');
   userAvatar.style.display = 'none';
   userName.style.display = 'none';
-  refreshBtn.style.display = 'none';
   signInBtn.style.display = 'inline-flex';
   signOutBtn.style.display = 'none';
   overlay.classList.remove('hidden');
@@ -324,7 +316,7 @@ function renderItems() {
 
   if (!items.length) {
     textSection.style.display = 'none';
-    fileSection.style.display = 'flex'; // Keep refresh button accessible
+    fileSection.style.display = 'none';
     emptyState.style.display = 'block';
     return;
   }
