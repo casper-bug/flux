@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flux-cache-v21';
+const CACHE_NAME = 'flux-cache-v23';
 const urlsToCache = [
   './',
   './index.html',
