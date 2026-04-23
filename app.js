@@ -117,7 +117,11 @@ function initGIS() {
 
 function signIn() {
   if (!tokenClient) {
-    initGIS();
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+      initGIS();
+    }
+  }
+  if (!tokenClient) {
     showToast('Connecting..', true, 'sync');
     return;
   }
