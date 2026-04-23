@@ -587,8 +587,10 @@ saveLinkBtn.addEventListener('click', async () => {
      text = 'https://' + text;
   }
 
+  const iconSpan = saveLinkBtn.querySelector('.material-symbols-outlined');
   saveLinkBtn.disabled = true;
-  saveLinkBtn.textContent = 'Saving...';
+  if (iconSpan) iconSpan.textContent = 'sync';
+  saveLinkBtn.classList.add('spinning');
   
   try {
     const metadata = {
@@ -616,7 +618,8 @@ saveLinkBtn.addEventListener('click', async () => {
     showToast('Failed to save', false);
   } finally {
     saveLinkBtn.disabled = false;
-    saveLinkBtn.textContent = 'Save Text';
+    if (iconSpan) iconSpan.textContent = 'send';
+    saveLinkBtn.classList.remove('spinning');
   }
 });
 linkInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveLinkBtn.click(); });
