@@ -80,7 +80,13 @@
     border-radius: 40px;
   }
   #signInBtn:hover, #signOutBtn:hover { background: var(--text); color: var(--bg); }
-  #signOutBtn { display: none; }
+  #signOutBtn { 
+    display: none; 
+    border-color: rgba(230, 0, 0, 0.4);
+    color: #ff5555;
+    background: rgba(230, 0, 0, 0.05);
+  }
+  #signOutBtn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
 
   /* MAIN */
   main {
@@ -208,12 +214,16 @@
   #toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     background: var(--text); color: var(--bg);
-    padding: 8px 16px; font-size: 0.8rem;
+    padding: 10px 20px; font-size: 0.85rem;
     opacity: 0; transition: all 0.3s; pointer-events: none;
     z-index: 1000;
+    display: flex; align-items: center; gap: 10px;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
   }
-  #toast.show { opacity: 1; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
   #toast.error { background: var(--danger); color: #fff; }
+  #toast .material-symbols-outlined { font-size: 1.2rem; }
 
   /* OVERLAY */
   #overlay {
@@ -245,25 +255,41 @@
 
   /* EMPTY STATE */
   .empty-state {
-    text-align: center; padding: 40px; color: var(--muted); font-size: 0.85rem;
+    text-align: center; padding: 60px 40px; color: var(--muted); font-size: 0.85rem;
     border: 1px dashed var(--border);
+    border-radius: 12px;
   }
   
-  /* DOWNLOAD PROGRESS OVERLAY */
-  #dlOverlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none; transition: opacity 0.2s;
-  }
-  #dlOverlay.active { opacity: 1; pointer-events: all; }
-  .dl-card {
-    background: var(--bg2); padding: 24px; border: 1px solid var(--border);
-    text-align: center; max-width: 300px; width: 90%;
-  }
-  .dl-title { margin-bottom: 12px; font-size: 0.85rem;}
-  .dl-progress { width: 100%; height: 2px; background: var(--border); margin-bottom: 8px;}
-  .dl-bar { height: 100%; background: var(--accent); width: 0%; }
   .dl-text { font-size: 0.75rem; color: var(--muted); }
+  
+  /* MODAL */
+  #modalOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px); z-index: 2000;
+    display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  #modalOverlay.active { display: flex; opacity: 1; }
+  .modal-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    width: 90%; max-width: 400px; padding: 32px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    transform: translateY(20px); transition: transform 0.3s;
+  }
+  #modalOverlay.active .modal-card { transform: translateY(0); }
+  .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px; color: var(--text); }
+  .modal-body { font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+  .modal-btn {
+    font-family: 'Space Mono', monospace; font-size: 0.8rem;
+    padding: 10px 20px; cursor: pointer; transition: all 0.2s;
+    border-radius: 4px;
+  }
+  .modal-btn.cancel { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .modal-btn.confirm { background: var(--text); border: 1px solid var(--text); color: var(--bg); }
+  .modal-btn.danger { background: var(--danger); border: 1px solid var(--danger); color: #fff; }
+  .modal-btn:hover { opacity: 0.8; transform: scale(1.02); }
+
   /* MOBILE OPTIMIZATIONS */
   @media (max-width: 600px) {
     nav { padding: 12px 16px; }
@@ -273,6 +299,9 @@
     #userName { display: none !important; } /* Hide name on mobile to save space */
     #userAvatar { width: 28px; height: 28px; }
     #signInBtn, #signOutBtn { padding: 6px 12px; font-size: 0.7rem; }
+    #signOutBtn span:not(.material-symbols-outlined) { display: none; }
+    #signOutBtn { padding: 6px; border-radius: 50%; color: var(--danger); border-color: rgba(230,0,0,0.3); }
+    #signOutBtn .material-symbols-outlined { font-size: 1.2rem; }
     
     main { padding: 30px 16px; }
     .omni-container { padding: 4px 8px; margin-bottom: 30px; }
@@ -285,6 +314,26 @@
     .item-name { font-size: 0.85rem; }
     .item-meta { font-size: 0.7rem; }
   }
+
+  /* FOOTER */
+  footer {
+    padding: 40px 20px 80px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+  .footer-links {
+    display: flex; justify-content: center; gap: 24px;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .footer-links a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+  .footer-links a:hover { color: var(--text); }
 </style>
 </head>
 <body>
@@ -295,11 +344,11 @@
     <div class="overlay-logo">
       <img src="logo.svg" style="width: 32px; height: 32px; vertical-align: middle; margin-right: 8px;" alt="logo">FLUX
     </div>
-    <p style="margin-bottom: 24px; font-size: 0.85rem; color: var(--muted);">File Transfer App</p>
+    <p style="margin-bottom: 24px; font-size: 0.85rem; color: var(--muted);">Personal File & Link Sharing</p>
     <button class="google-btn" id="overlaySignIn">
       Sign In
     </button>
-    <p class="overlay-note">All files and links will stay within your own Google Drive.</p>
+    <p class="overlay-note">All files and links stay within your own Google Drive.</p>
   </div>
 </div>
 
@@ -313,7 +362,10 @@
     <img id="userAvatar" alt="avatar" referrerpolicy="no-referrer">
     <span id="userName"></span>
     <button id="signInBtn">Sign In</button>
-    <button id="signOutBtn">Sign Out</button>
+    <button id="signOutBtn" title="Sign Out">
+      <span class="material-symbols-outlined" style="font-size: 1.1rem;">logout</span>
+      <span>Sign Out</span>
+    </button>
   </div>
 </nav>
 
@@ -325,9 +377,9 @@
 
   <div class="omni-container" id="dropZone">
     <input type="file" id="fileInput" multiple>
-    <input type="text" id="linkInput" placeholder="Paste link or drop files here..." autocomplete="off">
-    <button class="omni-btn" id="browseBtn" title="Browse Files"><span class="material-symbols-outlined">attach_file</span></button>
-    <button class="omni-btn" id="saveLinkBtn" title="Save Link"><span class="material-symbols-outlined">send</span></button>
+    <input type="text" id="linkInput" placeholder="Paste a link, code, or drop files here..." autocomplete="off">
+    <button class="omni-btn" id="browseBtn" title="Select Files"><span class="material-symbols-outlined">attach_file</span></button>
+    <button class="omni-btn" id="saveLinkBtn" title="Save Content"><span class="material-symbols-outlined">send</span></button>
   </div>
 
   <div class="progress-wrap" id="uploadProgress">
@@ -335,22 +387,40 @@
     <div id="uploadProgressLabel">Uploading...</div>
   </div>
 
+  <div class="section-title">
+    <span>TEXT</span>
+  </div>
+  <div id="textList" style="margin-bottom: 40px; display: flex; flex-direction: column; gap: 8px;">
+    <!-- Text items here -->
+  </div>
+
   <div class="section-title" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 24px;">
-    <span>INDEX</span>
+    <span>FILES</span>
     <button id="refreshBtn" class="refresh-btn" title="Refresh List" style="background: var(--bg3); padding: 6px; border-radius: 50%; border: 1px solid var(--border);">
       <span class="material-symbols-outlined" style="font-size: 1.4rem;">refresh</span>
     </button>
   </div>
   
-  <div id="itemsList">
+  <div id="fileList" style="display: flex; flex-direction: column; gap: 8px;">
     <div class="empty-state" id="emptyState">
-      Empty
+      <span class="material-symbols-outlined" style="display: block; margin-bottom: 12px; font-size: 2rem; opacity: 0.2;">upload_file</span>
+      No Items Yet
     </div>
   </div>
 </main>
 
+<footer>
+  <div class="footer-links">
+    <a id="aboutLink">ABOUT</a>
+    <a href="https://github.com/casper-bug" target="_blank">GITHUB</a>
+  </div>
+</footer>
+
 <!-- Toast -->
-<div id="toast"></div>
+<div id="toast">
+  <span class="material-symbols-outlined" id="toastIcon"></span>
+  <span id="toastText"></span>
+</div>
 
 <!-- DL Overlay -->
 <div id="dlOverlay">
@@ -358,6 +428,18 @@
     <div class="dl-title" id="dlTitle">Downloading...</div>
     <div class="dl-progress"><div class="dl-bar" id="dlBar"></div></div>
     <div class="dl-text" id="dlText">0%</div>
+  </div>
+</div>
+
+<!-- Custom Modal -->
+<div id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitle">Confirm Action</div>
+    <div class="modal-body" id="modalBody" style="max-height: 60vh; overflow-y: auto;">Are you sure you want to proceed?</div>
+    <div class="modal-actions" id="modalActions">
+      <button class="modal-btn cancel" id="modalCancelBtn">Cancel</button>
+      <button class="modal-btn confirm" id="modalConfirmBtn">Confirm</button>
+    </div>
   </div>
 </div>
 
