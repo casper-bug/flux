@@ -179,21 +179,6 @@
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  
-  /* SKELETONS */
-  .skeleton {
-    background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s infinite;
-    border-radius: 4px;
-  }
-  @keyframes loading {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-  .skeleton-text { height: 12px; width: 60%; }
-  .skeleton-sub { height: 8px; width: 40%; margin-top: 6px; }
-  .skeleton-icon { width: 40px; height: 40px; border-radius: 8px; }
 
   /* TIME GROUPS */
   .time-header {
@@ -589,7 +574,7 @@
     navigator.serviceWorker.register('sw.js').catch(console.error);
   }
 </script>
-<script src="app.js?v=41"></script>
-<div style="position:fixed; bottom:5px; right:10px; font-size:10px; color:#333; pointer-events:none;">v41</div>
+<script src="app.js?v=41.2"></script>
+<div style="position:fixed; bottom:5px; right:10px; font-size:10px; color:#333; pointer-events:none;">v41.2</div>
 </body>
 </html>
