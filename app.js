@@ -296,12 +296,11 @@ async function ensureFluxFolder() {
   const savedFolderId = localStorage.getItem('flux_folder_id');
   if (savedFolderId) {
     fluxFolderId = savedFolderId;
-    // Verify in background, don't await
     driveAPI(`https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id`).catch(e => {
       console.warn('Saved folder ID invalid, searching again...');
       localStorage.removeItem('flux_folder_id');
       fluxFolderId = null;
-      ensureFluxFolder(); // Try to find/create it again
+      ensureFluxFolder();
     });
     return;
   }
@@ -328,9 +327,7 @@ refreshBtn.addEventListener('click', loadItems);
 
 async function loadItems() {
   if (!accessToken || !fluxFolderId) return;
-  
   refreshBtn.classList.add('spinning');
-  showSkeletons();
 
   try {
     const q = encodeURIComponent(`'${fluxFolderId}' in parents and trashed=false`);
@@ -437,25 +434,6 @@ function updateCleanupStatus(fluxBytes) {
     status += ` · AUTO-CLEANUP: Disabled`;
   }
   if (cleanupStatus) cleanupStatus.textContent = status;
-}
-
-function showSkeletons() {
-  fileList.innerHTML = '';
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < 5; i++) {
-    const s = document.createElement('div');
-    s.className = 'item-card';
-    s.style.opacity = '0.5';
-    s.innerHTML = `
-      <div class="item-icon skeleton skeleton-icon"></div>
-      <div class="item-info">
-        <div class="skeleton skeleton-text"></div>
-        <div class="skeleton skeleton-sub"></div>
-      </div>
-    `;
-    frag.appendChild(s);
-  }
-  fileList.appendChild(frag);
 }
 
 function renderItems() {
@@ -1105,6 +1083,30 @@ window.addEventListener('drop', e => {
   dropZone.style.display = 'none'; 
   if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
 });
+
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+function timeAgo(date) {
+  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + "y";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + "mo";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + "d";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + "h";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + "m";
+  return Math.floor(seconds) + "s";
+}
 
 function getTimeGroup(dateStr) {
   const d = new Date(dateStr);
