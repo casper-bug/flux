@@ -543,24 +543,29 @@ async function handleFiles(files) {
   for (let i = 0; i < fileArray.length; i++) {
     const f = fileArray[i];
     
-    // Create inline placeholder
+    // Create inline placeholder with identical structure to real card
     const el = document.createElement('div');
     el.className = 'item-card uploading';
     el.innerHTML = `
       <div class="item-icon"><span class="material-symbols-outlined">${getFileIcon(f.name)}</span></div>
       <div class="item-info">
         <div class="item-name">${escHtml(f.name)}</div>
-        <div class="progress-mini-bg"><div class="progress-mini-bar"></div></div>
+        <div class="item-meta">
+          <div class="progress-mini-bg"><div class="progress-mini-bar"></div></div>
+        </div>
       </div>
       <div class="item-actions">
-        <span style="font-size: 0.6rem; color: var(--muted);">UPLOADING</span>
+        <button class="action-btn" style="opacity:0; pointer-events:none;"><span class="material-symbols-outlined">sync</span></button>
       </div>
     `;
     fileList.prepend(el);
 
     try {
       await uploadSingleFile(f, el);
-      el.remove(); // Remove placeholder once actual file is loaded
+      // Morph to "Ready" state while waiting for refresh
+      el.classList.remove('uploading');
+      el.querySelector('.item-actions').innerHTML = '<span style="font-size:0.6rem; color:var(--text); font-weight:700;">SAVED</span>';
+      el.querySelector('.item-meta').innerHTML = 'Processing in Drive...';
     } catch(e) {
       showToast(`Failed to upload ${f.name}`, false);
       el.remove();
