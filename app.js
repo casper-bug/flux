@@ -289,17 +289,18 @@ async function loadItems() {
     localStorage.setItem('flux_items_cache', JSON.stringify(items));
     renderItems();
     
-    // Auto-copy latest text (OTPs, Passwords, Links)
+    // Auto-copy / Notification logic (Only for new items)
     if (items.length > 0) {
       const latest = items[0];
-      const isText = latest.mimeType === 'application/vnd.flux.link' || (latest.appProperties && latest.appProperties.url);
-      
-      if (isText) {
-        const text = latest.appProperties?.url || latest.name;
-        const lastCopied = localStorage.getItem('flux_last_copied');
-        
-        if (lastCopied !== latest.id && !localStorage.getItem(`self_saved_${latest.id}`)) {
-          // Auto-copy logic: Always auto-copy OTPs/Passwords, Links depend on type
+      const latestTime = new Date(latest.createdTime).getTime();
+      const lastSeenTime = parseInt(localStorage.getItem('flux_last_seen_time') || '0', 10);
+      const isNew = latestTime > lastSeenTime;
+      const wasSelfSaved = localStorage.getItem(`self_saved_${latest.id}`);
+
+      if (isNew && !wasSelfSaved) {
+        const isText = latest.mimeType === 'application/vnd.flux.link' || (latest.appProperties && latest.appProperties.url);
+        if (isText) {
+          const text = latest.appProperties?.url || latest.name;
           const otp = isOTP(text);
           const pwd = isPassword(text);
           const link = text.startsWith('http');
@@ -307,22 +308,17 @@ async function loadItems() {
           if (otp || pwd || link) {
             try {
               await navigator.clipboard.writeText(text);
-              localStorage.setItem('flux_last_copied', latest.id);
               const label = otp ? 'OTP' : (pwd ? 'Password' : 'Link');
               showToast(`${label} auto-copied`, true, 'content_copy');
-            } catch(e) {
-              console.warn('Clipboard auto-copy blocked', e);
-            }
+            } catch(e) { console.warn('Clipboard blocked', e); }
           }
+        } else {
+          showToast('New file received!', true);
         }
-      } else {
-        // If it's a file and it's new, just notify
-        const lastSeen = localStorage.getItem('flux_last_seen');
-        if (lastSeen && lastSeen !== latest.id && !localStorage.getItem(`self_saved_${latest.id}`)) {
-           showToast('New file received!', true);
-        }
-        localStorage.setItem('flux_last_seen', latest.id);
       }
+      
+      // Always update last seen time to the latest item in the list
+      localStorage.setItem('flux_last_seen_time', latestTime.toString());
     }
   } catch(e) {
     showToast('Failed to load items', false);
