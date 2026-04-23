@@ -27,6 +27,7 @@ const saveLinkBtn   = document.getElementById('saveLinkBtn');
 const uploadProgress= document.getElementById('uploadProgress');
 const uploadBar     = document.getElementById('uploadProgressBar');
 const uploadLbl     = document.getElementById('uploadProgressLabel');
+const uploadPct     = document.getElementById('uploadProgressPercent');
 
 const textList      = document.getElementById('textList');
 const fileList      = document.getElementById('fileList');
@@ -564,7 +565,11 @@ function uploadSingleFile(file) {
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       
       xhr.upload.onprogress = e => {
-        if (e.lengthComputable) uploadBar.style.width = (e.loaded / e.total * 100) + '%';
+        if (e.lengthComputable) {
+          const pct = Math.floor(e.loaded / e.total * 100);
+          uploadBar.style.width = pct + '%';
+          uploadPct.textContent = pct + '%';
+        }
       };
       
       xhr.onload = () => {
