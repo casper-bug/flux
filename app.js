@@ -123,15 +123,9 @@ function initGIS() {
 
 function signIn() {
   if (!tokenClient) {
-    initGIS(); // Try initializing on-demand
-    if (!tokenClient) {
-      showToast('Initializing Google Sign-In...', true, 'sync');
-      setTimeout(() => {
-        if (tokenClient) tokenClient.requestAccessToken({ prompt: 'consent' });
-        else showToast('Sign-In not ready. Check connection.', false);
-      }, 2000);
-      return;
-    }
+    initGIS();
+    showToast('Connecting to Google...', true, 'sync');
+    return;
   }
   tokenClient.requestAccessToken({ prompt: 'consent' });
 }
@@ -330,7 +324,7 @@ function renderItems() {
 
   if (!items.length) {
     textSection.style.display = 'none';
-    fileSection.style.display = 'none';
+    fileSection.style.display = 'flex'; // Keep refresh button accessible
     emptyState.style.display = 'block';
     return;
   }
