@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flux-cache-v18';
+const CACHE_NAME = 'flux-cache-v21';
 const urlsToCache = [
   './',
   './index.html',
@@ -17,12 +17,13 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
+  const cacheAllowlist = [CACHE_NAME, 'flux-share-target'];
   event.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME && key !== 'flux-share-target') {
-            return caches.delete(key);
+        cacheNames.map(cacheName => {
+          if (cacheAllowlist.indexOf(cacheName) === -1) {
+            return caches.delete(cacheName);
           }
         })
       );
@@ -77,10 +78,11 @@ self.addEventListener('fetch', event => {
       .then(response => {
         if (response) return response;
         return fetch(event.request).then(fetchRes => {
-          return caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, fetchRes.clone());
-            return fetchRes;
-          });
+          if (event.request.method === 'GET' && fetchRes && fetchRes.status === 200) {
+            const resClone = fetchRes.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+          }
+          return fetchRes;
         });
       })
   );
