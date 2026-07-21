@@ -105,7 +105,8 @@ function recoverSession() {
     });
   } else {
     document.body.classList.remove('has-session');
-    localStorage.removeItem('flux_session');
+    clearStoredAuth(true);
+    if (localStorage.getItem('flux_session')) trySilentSignIn();
   }
 }
 
@@ -130,6 +131,27 @@ function loadGISScript() {
 }
 
 let tokenClient;
+let silentAuthInFlight = false;
+
+function clearStoredAuth(preserveSession = false) {
+  localStorage.removeItem('flux_token');
+  localStorage.removeItem('flux_token_expiry');
+  localStorage.removeItem('flux_login_time');
+  if (!preserveSession) localStorage.removeItem('flux_session');
+}
+
+function trySilentSignIn() {
+  if (!tokenClient || accessToken || silentAuthInFlight) return;
+  if (!localStorage.getItem('flux_session')) return;
+  silentAuthInFlight = true;
+  try {
+    tokenClient.requestAccessToken({ prompt: '' });
+  } catch (e) {
+    silentAuthInFlight = false;
+    clearStoredAuth(true);
+  }
+}
+
 function initGIS() {
   if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') return;
   if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
@@ -145,7 +167,7 @@ function initGIS() {
   
   // If we haven't recovered a session yet, check for flux_session flag
   if (!accessToken && localStorage.getItem('flux_session')) {
-    // We could try silent auth here, but usually recoverSession handles it
+    trySilentSignIn();
   }
 }
 
@@ -166,6 +188,7 @@ function signIn() {
   }
   
   try {
+    silentAuthInFlight = false;
     tokenClient.requestAccessToken({ prompt: 'consent' });
   } catch (e) {
     console.error('Sign-in error:', e);
@@ -174,7 +197,18 @@ function signIn() {
 }
 
 function handleTokenResponse(resp) {
-  if (resp.error) { showToast('Sign-in failed', false); return; }
+  const wasSilent = silentAuthInFlight;
+  silentAuthInFlight = false;
+  if (resp.error) {
+    if (wasSilent) {
+      accessToken = null;
+      clearStoredAuth(true);
+      overlay.classList.remove('hidden');
+      return;
+    }
+    showToast('Sign-in failed', false);
+    return;
+  }
   
   if (!google.accounts.oauth2.hasGrantedAllScopes(resp, 'https://www.googleapis.com/auth/drive.file')) {
     showToast('Drive permission missing', false);
@@ -185,6 +219,8 @@ function handleTokenResponse(resp) {
   localStorage.setItem('flux_session', '1');
   localStorage.setItem('flux_token', accessToken);
   localStorage.setItem('flux_token_expiry', Date.now() + (resp.expires_in * 1000) - 60000);
+  localStorage.setItem('flux_login_time', Date.now().toString());
+  document.body.classList.add('has-session');
   fetchUserInfo();
   overlay.classList.add('hidden');
 }
@@ -195,7 +231,11 @@ async function fetchUserInfo() {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
     if (!r.ok) {
-       if (r.status === 401) signOut();
+       if (r.status === 401) {
+        accessToken = null;
+        clearStoredAuth(true);
+        trySilentSignIn();
+       }
        return;
     }
     const info = await r.json();
@@ -234,9 +274,7 @@ function signOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken);
   accessToken = null;
   fluxFolderId = null;
-  localStorage.removeItem('flux_session');
-  localStorage.removeItem('flux_token');
-  localStorage.removeItem('flux_token_expiry');
+  clearStoredAuth(false);
   localStorage.removeItem('flux_user_info');
   userAvatar.style.display = 'none';
   userName.style.display = 'none';
@@ -255,7 +293,14 @@ overlaySignIn.addEventListener('click', signIn);
 
 // ─── Drive API Helper ────────────────────────────────────────
 async function driveAPI(url, options = {}) {
-  if (!accessToken) { signIn(); throw new Error('Not authenticated'); }
+  if (!accessToken) {
+    if (localStorage.getItem('flux_session')) {
+      trySilentSignIn();
+      throw new Error('Session refresh in progress');
+    }
+    signIn();
+    throw new Error('Not authenticated');
+  }
   options.headers = options.headers || {};
   options.headers['Authorization'] = `Bearer ${accessToken}`;
   
@@ -265,9 +310,10 @@ async function driveAPI(url, options = {}) {
     });
     
     if (res.status === 401) { 
-      localStorage.removeItem('flux_token');
-      signIn(); 
-      throw new Error('Unauthorized - Please sign in again'); 
+      accessToken = null;
+      clearStoredAuth(true);
+      trySilentSignIn();
+      throw new Error('Unauthorized - refreshing session'); 
     }
     
     if (!res.ok) {
