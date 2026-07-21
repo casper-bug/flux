@@ -105,7 +105,8 @@ function recoverSession() {
     });
   } else {
     document.body.classList.remove('has-session');
-    localStorage.removeItem('flux_session');
+    clearStoredAuth(true);
+    if (localStorage.getItem('flux_session')) trySilentSignIn();
   }
 }
 
@@ -130,6 +131,29 @@ function loadGISScript() {
 }
 
 let tokenClient;
+let silentAuthInFlight = false;
+let silentAuthAttempted = false;
+
+function clearStoredAuth(preserveSession = false) {
+  localStorage.removeItem('flux_token');
+  localStorage.removeItem('flux_token_expiry');
+  localStorage.removeItem('flux_login_time');
+  if (!preserveSession) localStorage.removeItem('flux_session');
+}
+
+function trySilentSignIn() {
+  if (!tokenClient || accessToken || silentAuthInFlight || silentAuthAttempted) return;
+  if (!localStorage.getItem('flux_session')) return;
+  silentAuthAttempted = true;
+  silentAuthInFlight = true;
+  try {
+    tokenClient.requestAccessToken({ prompt: '' });
+  } catch (e) {
+    silentAuthInFlight = false;
+    clearStoredAuth(false);
+  }
+}
+
 function initGIS() {
   if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') return;
   if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
@@ -145,7 +169,7 @@ function initGIS() {
   
   // If we haven't recovered a session yet, check for flux_session flag
   if (!accessToken && localStorage.getItem('flux_session')) {
-    // We could try silent auth here, but usually recoverSession handles it
+    trySilentSignIn();
   }
 }
 
@@ -166,6 +190,7 @@ function signIn() {
   }
   
   try {
+    silentAuthInFlight = false;
     tokenClient.requestAccessToken({ prompt: 'consent' });
   } catch (e) {
     console.error('Sign-in error:', e);
@@ -174,7 +199,18 @@ function signIn() {
 }
 
 function handleTokenResponse(resp) {
-  if (resp.error) { showToast('Sign-in failed', false); return; }
+  const wasSilent = silentAuthInFlight;
+  silentAuthInFlight = false;
+  if (resp.error) {
+    if (wasSilent) {
+      clearStoredAuth(false);
+      document.body.classList.remove('has-session');
+      overlay.classList.remove('hidden');
+      return;
+    }
+    showToast('Sign-in failed', false);
+    return;
+  }
   
   if (!google.accounts.oauth2.hasGrantedAllScopes(resp, 'https://www.googleapis.com/auth/drive.file')) {
     showToast('Drive permission missing', false);
@@ -182,9 +218,11 @@ function handleTokenResponse(resp) {
   }
   
   accessToken = resp.access_token;
+  silentAuthAttempted = false;
   localStorage.setItem('flux_session', '1');
   localStorage.setItem('flux_token', accessToken);
   localStorage.setItem('flux_token_expiry', Date.now() + (resp.expires_in * 1000) - 60000);
+  localStorage.setItem('flux_login_time', Date.now().toString());
   fetchUserInfo();
   overlay.classList.add('hidden');
 }
@@ -234,9 +272,7 @@ function signOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken);
   accessToken = null;
   fluxFolderId = null;
-  localStorage.removeItem('flux_session');
-  localStorage.removeItem('flux_token');
-  localStorage.removeItem('flux_token_expiry');
+  clearStoredAuth(false);
   localStorage.removeItem('flux_user_info');
   userAvatar.style.display = 'none';
   userName.style.display = 'none';
