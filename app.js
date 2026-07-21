@@ -11,6 +11,9 @@ let accessToken = null;
 let fluxFolderId = null;
 let items = [];
 let recentUploads = [];
+let loadItemsRequestSeq = 0;
+let itemMissCounts = {};
+const ITEM_MISS_THRESHOLD = 2;
 
 // ─── DOM refs ────────────────────────────────────────────────
 const _id = id => document.getElementById(id);
@@ -111,13 +114,56 @@ function recoverSession() {
 }
 
 function loadCachedItems() {
+  loadItemMissCounts();
   const cached = localStorage.getItem('flux_items_cache');
   if (cached) {
     try {
-      items = JSON.parse(cached);
-      renderItems();
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        items = parsed;
+        renderItems();
+      }
     } catch (e) {}
   }
+}
+
+function loadItemMissCounts() {
+  const raw = localStorage.getItem('flux_item_miss_counts');
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      itemMissCounts = parsed;
+    }
+  } catch (e) {}
+}
+
+function persistItemsCache() {
+  localStorage.setItem('flux_items_cache', JSON.stringify(items));
+  localStorage.setItem('flux_item_miss_counts', JSON.stringify(itemMissCounts));
+}
+
+function mergeFetchedItemsWithCache(fetchedItems) {
+  const fetched = Array.isArray(fetchedItems) ? fetchedItems : [];
+  const fetchedMap = new Map(fetched.map(item => [item.id, item]));
+  const mergedMap = new Map(items.map(item => [item.id, item]));
+
+  for (const [id, item] of fetchedMap.entries()) {
+    mergedMap.set(id, item);
+    delete itemMissCounts[id];
+  }
+
+  for (const cachedItem of items) {
+    if (!cachedItem.id || fetchedMap.has(cachedItem.id)) continue;
+    const misses = (itemMissCounts[cachedItem.id] || 0) + 1;
+    itemMissCounts[cachedItem.id] = misses;
+    if (misses >= ITEM_MISS_THRESHOLD) {
+      mergedMap.delete(cachedItem.id);
+      delete itemMissCounts[cachedItem.id];
+    }
+  }
+
+  return Array.from(mergedMap.values()).sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
 }
 
 // ─── Google Identity Services ────────────────────────────────
@@ -274,8 +320,10 @@ function signOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken);
   accessToken = null;
   fluxFolderId = null;
+  itemMissCounts = {};
   clearStoredAuth(false);
   localStorage.removeItem('flux_user_info');
+  localStorage.removeItem('flux_item_miss_counts');
   userAvatar.style.display = 'none';
   userName.style.display = 'none';
   signInBtn.style.display = 'inline-flex';
@@ -370,20 +418,23 @@ refreshBtn.addEventListener('click', loadItems);
 
 async function loadItems() {
   if (!accessToken || !fluxFolderId) return;
+  const requestSeq = ++loadItemsRequestSeq;
   haptic(15);
   refreshBtn.classList.add('spinning');
 
   try {
     const q = encodeURIComponent(`'${fluxFolderId}' in parents and trashed=false`);
     const r = await driveAPI(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size,createdTime,appProperties,webViewLink)&orderBy=createdTime desc`);
-    items = r.files || [];
+    if (requestSeq !== loadItemsRequestSeq) return;
+    const fetchedItems = Array.isArray(r.files) ? r.files : [];
+    items = mergeFetchedItemsWithCache(fetchedItems);
     
     // Auto-Cleanup Logic
     const cleanupDays = parseInt(localStorage.getItem('flux_cleanup_days') || '0');
     if (cleanupDays > 0) {
       const now = Date.now();
       const threshold = cleanupDays * 24 * 60 * 60 * 1000;
-      for (const item of items) {
+      for (const item of fetchedItems) {
         if (now - new Date(item.createdTime).getTime() > threshold) {
           driveAPI(`https://www.googleapis.com/drive/v3/files/${item.id}`, { method: 'DELETE' }).catch(()=>{});
         }
@@ -391,7 +442,7 @@ async function loadItems() {
     }
 
     // Storage Analysis
-    const totalFluxBytes = items.reduce((acc, i) => acc + parseInt(i.size || 0), 0);
+    const totalFluxBytes = fetchedItems.reduce((acc, i) => acc + parseInt(i.size || 0), 0);
     if (storagePulse) storagePulse.innerHTML = `SPACE USED: ${formatBytes(totalFluxBytes)}`;
     
     // Fetch Drive Quota
@@ -402,9 +453,9 @@ async function loadItems() {
       updateStorageUI(totalFluxBytes);
     } catch(e) {}
 
-    const newItemsJson = JSON.stringify(items);
     const oldItemsJson = localStorage.getItem('flux_items_cache');
-    localStorage.setItem('flux_items_cache', newItemsJson);
+    const newItemsJson = JSON.stringify(items);
+    persistItemsCache();
     
     // Always re-render if it's the first load or if things changed
     if (newItemsJson !== oldItemsJson || !oldItemsJson) {
@@ -453,9 +504,13 @@ async function loadItems() {
       localStorage.setItem('flux_last_seen_time', latestTime.toString());
     }
   } catch(e) {
-    showToast('Failed to load items', false);
+    if (requestSeq === loadItemsRequestSeq) {
+      showToast('Failed to load items', false);
+    }
   } finally {
-    refreshBtn.classList.remove('spinning');
+    if (requestSeq === loadItemsRequestSeq) {
+      refreshBtn.classList.remove('spinning');
+    }
   }
 }
 
@@ -661,7 +716,8 @@ async function deleteItem(id, name, el) {
     // Remove from state and trigger a full re-render for consistency
     items = items.filter(i => i.id !== id);
     recentUploads = recentUploads.filter(r => r.id !== id);
-    localStorage.setItem('flux_items_cache', JSON.stringify(items));
+    delete itemMissCounts[id];
+    persistItemsCache();
     renderItems();
   }, { once: true });
 }
